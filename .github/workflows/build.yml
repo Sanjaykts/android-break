@@ -58,14 +58,14 @@ jobs:
           PROPS
 
       - name: Test
-        run: ./gradlew --project-dir agent :app:testDebugUnitTest :app:lintDebug
+        run: ./agent/gradlew --project-dir agent :app:testDebugUnitTest :app:lintDebug
 
       - name: Assemble signed release
         env:
           RELAY_URL: ${{ secrets.RELAY_URL }}
           AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
           CONSOLE_TOKEN: ${{ secrets.CONSOLE_TOKEN }}
-        run: ./gradlew --project-dir agent :app:assembleRelease
+        run: ./agent/gradlew --project-dir agent :app:assembleRelease
 
       - name: Verify signature
         run: |
