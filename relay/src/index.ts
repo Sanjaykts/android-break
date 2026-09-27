@@ -43,6 +43,9 @@ export default {
  * (simplest from a shell script) or as a bearer header.
  */
 async function handleDevices(request: Request, url: URL, env: Env): Promise<Response> {
+  const misconfiguredResponse = misconfigured(env, "CONSOLE_TOKEN");
+  if (misconfiguredResponse) return misconfiguredResponse;
+
   const bearer = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? "";
   const supplied = url.searchParams.get("token") ?? bearer;
   if (!secretsEqual(supplied, env.CONSOLE_TOKEN)) {
@@ -67,6 +70,12 @@ async function handleWs(
   expectedToken: string,
   kind: "agent" | "console"
 ): Promise<Response> {
+  const misconfiguredResponse = misconfigured(
+    env,
+    kind === "agent" ? "AGENT_TOKEN" : "CONSOLE_TOKEN"
+  );
+  if (misconfiguredResponse) return misconfiguredResponse;
+
   if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
     return new Response("expected websocket upgrade", { status: 426 });
   }
@@ -93,18 +102,40 @@ function hubStub(env: Env): DurableObjectStub<Hub> {
 }
 
 /**
- * Length-independent comparison. These are demo-scale shared secrets rather than
- * per-device credentials, but there is no reason to leak length via an early
- * return.
+ * Length-independent comparison of a supplied token against a Worker secret.
+ *
+ * **Fails closed.** `TextEncoder.encode(undefined)` yields `""`, so a naive
+ * comparison returns *true* for "no token supplied" against "no secret
+ * configured" -- which means a Worker deployed before its secrets are set accepts
+ * every request that simply omits the token. That is a real open-relay bug, and
+ * it was found by CI rather than by review.
  */
-function secretsEqual(a: string, b: string): boolean {
+function secretsEqual(supplied: string, expected: string | undefined): boolean {
+  if (!expected) return false;
   const enc = new TextEncoder();
-  const ab = enc.encode(a);
-  const bb = enc.encode(b);
+  const ab = enc.encode(supplied);
+  const bb = enc.encode(expected);
   let diff = ab.length ^ bb.length;
   const n = Math.max(ab.length, bb.length);
   for (let i = 0; i < n; i++) {
     diff |= (ab[i] ?? 0) ^ (bb[i] ?? 0);
   }
   return diff === 0;
+}
+
+/**
+ * Surfaces an unconfigured Worker as an explicit 503 rather than a puzzling 401,
+ * so a missing `wrangler secret put` is obvious in the first minute of a demo
+ * rather than halfway through it.
+ */
+function misconfigured(env: Env, which: string): Response | null {
+  if (env.AGENT_TOKEN && env.CONSOLE_TOKEN) return null;
+  return Response.json(
+    {
+      error: "relay is not configured",
+      detail: `missing Worker secret: ${which}`,
+      fix: "wrangler secret put AGENT_TOKEN && wrangler secret put CONSOLE_TOKEN",
+    },
+    { status: 503 }
+  );
 }

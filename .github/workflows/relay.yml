@@ -27,6 +27,13 @@ jobs:
       - name: Install
         run: npm ci
 
+      # .dev.vars is gitignored, so CI has to create it. Without this the Worker
+      # starts with no secrets, which the relay correctly reports as 503 -- and
+      # which is also how the fail-closed auth path gets exercised.
+      - name: Write dev secrets
+        run: |
+          printf 'AGENT_TOKEN="dev-agent-token"\nCONSOLE_TOKEN="dev-console-token"\n' > .dev.vars
+
       - name: Typecheck
         run: npm run typecheck
 

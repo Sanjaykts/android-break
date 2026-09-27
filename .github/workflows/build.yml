@@ -97,14 +97,18 @@ jobs:
           SHA="$(git rev-parse --short HEAD)"
           VERSION="$(grep -m1 'versionName' agent/app/build/outputs/apk/release/output-metadata.json | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')"
 
+          # `gh release upload` accepts only --clobber; --notes is not a flag on
+          # that subcommand, so notes are applied by a separate `edit`. The first
+          # run took the `create` branch and worked, which hid this until the
+          # second run.
+          NOTES="Rolling build from ${SHA}."
           if gh release view "$ROLLING_TAG" >/dev/null 2>&1; then
-            gh release upload "$ROLLING_TAG" agent/agent.apk --clobber \
-              --notes "Rolling build from ${SHA}."
-            gh release edit "$ROLLING_TAG" --title "Break Remote agent (latest)" --notes "Rolling build from ${SHA}."
+            gh release upload "$ROLLING_TAG" agent/agent.apk --clobber
+            gh release edit "$ROLLING_TAG" \
+              --title "Break Remote agent (latest)" --notes "$NOTES"
           else
             gh release create "$ROLLING_TAG" agent/agent.apk \
-              --title "Break Remote agent (latest)" \
-              --notes "Rolling build from ${SHA}."
+              --title "Break Remote agent (latest)" --notes "$NOTES"
           fi
 
           # Also cut an immutable versioned release so there is a rollback target

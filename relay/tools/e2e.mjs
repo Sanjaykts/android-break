@@ -122,6 +122,14 @@ async function main() {
     const res = await fetch(`${HTTP}/devices`).catch(() => null);
     check("missing console token is rejected", res?.status === 401, `got ${res?.status}`);
   }
+  {
+    // Regression guard for an open-relay bug found by CI, not by review:
+    // TextEncoder.encode(undefined) is "", so comparing a missing token against
+    // an unset secret returned TRUE and a Worker deployed before its secrets were
+    // set accepted every request that simply omitted the token.
+    const empty = await fetch(`${HTTP}/devices?token=`).catch(() => null);
+    check("an explicitly empty token is rejected", empty?.status === 401, `got ${empty?.status}`);
+  }
 
   // ── 2. hello and discovery ─────────────────────────────────────────────────
   console.log("\n2. Discovery");
