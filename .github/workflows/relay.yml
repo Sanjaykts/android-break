@@ -1,0 +1,57 @@
+name: relay
+
+# The relay is the one component with no device in the loop, so it is the one
+# component that can be tested properly. Both suites run against a real local
+# relay rather than a mock, because the things that break here -- hibernation,
+# tag routing, byte preservation -- only exist in the real runtime.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: relay
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Start a local relay
+        run: |
+          nohup npx wrangler dev --port 8787 --ip 127.0.0.1 > /tmp/wrangler.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS --max-time 2 http://127.0.0.1:8787/health > /dev/null 2>&1; then
+              echo "relay up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::relay did not start"
+          cat /tmp/wrangler.log
+          exit 1
+
+      - name: Control-plane end-to-end
+        run: node tools/e2e.mjs --url ws://127.0.0.1:8787
+
+      # Short by default so CI stays fast. The 30-minute soak is a pre-demo
+      # ritual, not something every push needs to pay for.
+      - name: Frame relay load
+        run: node tools/loadtest.mjs --url ws://127.0.0.1:8787 --fps 10 --kb 40 --seconds 30
+
+      - name: Relay logs on failure
+        if: failure()
+        run: cat /tmp/wrangler.log
