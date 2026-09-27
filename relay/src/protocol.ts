@@ -56,6 +56,7 @@ export type ConsoleMessage =
   | { op: "disconnect" }
   | { op: "tap"; x: number; y: number }
   | { op: "swipe"; x1: number; y1: number; x2: number; y2: number; ms: number }
+  | { op: "drag"; x1: number; y1: number; x2: number; y2: number; ms: number }
   | { op: "longpress"; x: number; y: number; ms: number }
   | { op: "doubleTap"; x: number; y: number }
   | { op: "key"; code: number }

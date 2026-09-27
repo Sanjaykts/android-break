@@ -179,9 +179,12 @@ async function main() {
 
     // 480x854 in display space.
     agent.send(encodeFrame({ did: DEVICE, w: 480, h: 854, rot: 0, seq: 1, q: 35, ts: 0 }, JPEG));
+    // Wait for the *decoded* size, not merely a non-zero one: a fresh canvas is
+    // already 300x150, so `width > 0` returns instantly and this assertion then
+    // passes or fails depending on scheduling.
     await page.waitForFunction(
-      () => document.querySelector("#stage").width > 0,
-      { timeout: 8000 }
+      () => document.querySelector("#stage").width === 480,
+      { timeout: 10000 }
     );
 
     const canvas = await page.$eval("#stage", (c) => ({
@@ -258,6 +261,39 @@ async function main() {
     const swipe = received.find((m) => m.op === "swipe");
     check("a drag becomes a swipe with both endpoints mapped",
       !!swipe && swipe.y1 > swipe.y2, JSON.stringify(swipe));
+
+    received.length = 0;
+    await page.mouse.move(box.x + box.w * 0.7, box.y + box.h * 0.7);
+    await page.mouse.down();
+    await sleep(420);                       // hold past the drag threshold
+    await page.mouse.move(box.x + box.w * 0.7, box.y + box.h * 0.3, { steps: 10 });
+    await page.mouse.up();
+    await sleep(350);
+    const dragOp = received.find((m) => m.op === "drag");
+    check("a held drag becomes a drag, not a swipe", !!dragOp, JSON.stringify(received.map((m) => m.op)));
+    check("the drag endpoints are mapped into the header space",
+      dragOp && dragOp.y1 > dragOp.y2, JSON.stringify(dragOp));
+
+    // ── 4b. capture lifecycle reaches the banner ────────────────────────────
+    console.log("\n4b. Capture lifecycle");
+    agent.send(JSON.stringify({
+      op: "event", kind: "capture", state: "needsConsent",
+      reason: "screen capture was stopped; tap Re-grant on the phone",
+    }));
+    await page.waitForFunction(
+      () => /NEEDS A TAP/i.test(document.querySelector("#banner")?.textContent || ""),
+      { timeout: 4000 }
+    ).then(() => check("needsConsent is shown in the banner, not just the log", true))
+     .catch(async () => check("needsConsent is shown in the banner, not just the log", false,
+        await page.$eval("#banner", (e) => e.textContent)));
+
+    agent.send(JSON.stringify({ op: "event", kind: "capture", state: "live" }));
+    await page.waitForFunction(
+      () => /live/i.test(document.querySelector("#banner")?.textContent || ""),
+      { timeout: 4000 }
+    ).then(() => check("capture recovering clears the banner", true))
+     .catch(async () => check("capture recovering clears the banner", false,
+        await page.$eval("#banner", (e) => e.textContent)));
 
     // ── 5. global nav buttons ───────────────────────────────────────────────
     console.log("\n5. Controls");

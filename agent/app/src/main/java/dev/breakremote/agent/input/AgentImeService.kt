@@ -41,8 +41,20 @@ class AgentImeService : InputMethodService() {
         super.onDestroy()
     }
 
-    override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
-        super.onStartInputView(info, restarting)
+    /**
+     * The InputConnection must be captured in `onStartInput`, **not**
+     * `onStartInputView`.
+     *
+     * `onStartInputView` is only invoked when the IME has been asked whether it
+     * wants to show a view, and [onEvaluateInputViewShown] returns false on
+     * purpose -- a visible keyboard would cover the screen we are streaming.
+     * Capturing there meant `activeConnection` was permanently null, so
+     * `commitText` always failed and the whole IME fallback silently did
+     * nothing. `onStartInput` is called unconditionally when a field gains
+     * focus, which is exactly the moment the connection becomes valid.
+     */
+    override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
+        super.onStartInput(info, restarting)
         activeConnection = currentInputConnection
     }
 

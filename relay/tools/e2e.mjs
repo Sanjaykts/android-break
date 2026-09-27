@@ -184,6 +184,7 @@ async function main() {
   const commands = [
     { op: "tap", x: 120, y: 340 },
     { op: "swipe", x1: 1, y1: 2, x2: 3, y2: 4, ms: 250 },
+    { op: "drag", x1: 5, y1: 6, x2: 7, y2: 8, ms: 400 },
     { op: "longpress", x: 10, y: 20, ms: 700 },
     { op: "doubleTap", x: 5, y: 6 },
     { op: "key", code: 66 },

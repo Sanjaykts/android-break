@@ -267,6 +267,22 @@ class ActionQueue(
                             .build()
                     )
                 }
+                "drag" -> {
+                    // Same stroke as a swipe, but preceded by a hold so Android
+                    // treats it as a drag rather than a scroll.
+                    val hold = action.int("hold", 250).toLong()
+                    val p = Path().apply {
+                        moveTo(action.int("x1").toFloat(), action.int("y1").toFloat())
+                        lineTo(action.int("x2").toFloat(), action.int("y2").toFloat())
+                    }
+                    runner.dispatch(
+                        GestureDescription.Builder()
+                            .addStroke(GestureDescription.StrokeDescription(
+                                p, 0, hold + action.int("ms", 400).toLong()
+                            ))
+                            .build()
+                    )
+                }
                 "key" -> runner.performKey(action.int("code"))
                 "text" -> runner.typeText(action.str("s"))
                 "global" -> {

@@ -113,6 +113,11 @@ class ControlService : AccessibilityService(), ActionQueue.GestureRunner {
                 msg.optLong("ms", 700L)
             )
             "doubleTap" -> queue.submitDoubleTap(msg.optInt("x").toFloat(), msg.optInt("y").toFloat())
+            "drag" -> queue.submitDrag(
+                msg.optInt("x1").toFloat(), msg.optInt("y1").toFloat(),
+                msg.optInt("x2").toFloat(), msg.optInt("y2").toFloat(),
+                msg.optLong("ms", 400L), DRAG_HOLD_MS
+            )
             "swipe" -> queue.submitSwipe(
                 msg.optInt("x1").toFloat(), msg.optInt("y1").toFloat(),
                 msg.optInt("x2").toFloat(), msg.optInt("y2").toFloat(),
@@ -346,6 +351,17 @@ class ControlService : AccessibilityService(), ActionQueue.GestureRunner {
             gestureProbeResult = ok
         }
         private const val GESTURE_TIMEOUT_MS = 5_000L
+
+        /**
+         * How long the finger stays down before moving, in a drag.
+         *
+         * Android gives a touched view a short grace period to claim the gesture
+         * before the framework starts treating it as a scroll. A drag that moves
+         * immediately is therefore interpreted as a flick, and a slider or a
+         * reorder handle will not follow it. Holding first is what makes it a
+         * drag rather than a swipe.
+         */
+        private const val DRAG_HOLD_MS = 250L
         private const val MAX_SEARCH_DEPTH = 40
 
         private const val KEYCODE_ENTER = 66

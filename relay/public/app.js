@@ -196,6 +196,7 @@ function onJson(text) {
       break;
 
     case "event":
+      if (m.kind === "capture") onCaptureEvent(m);
       log(`event ${m.kind} ${summarise(m)}`, "evt");
       break;
 
@@ -206,6 +207,35 @@ function onJson(text) {
     case "error":
       log(`relay: ${m.message}`, "err");
       setBanner(m.message, "error");
+      break;
+  }
+}
+
+/**
+ * The agent's capture lifecycle, promoted to the banner.
+ *
+ * `needsConsent` is the one state that must never be buried in a log nobody is
+ * reading: Android 14+ cannot re-acquire MediaProjection consent silently, so
+ * the live view stays blank until someone re-taps on the phone. Showing that as
+ * a dim line in a scrolling log means it gets discovered as "the demo is just
+ * not working".
+ */
+function onCaptureEvent(m) {
+  switch (m.state) {
+    case "live":
+      setBanner(`live — ${state.pairedId}`, "live");
+      break;
+    case "needsConsent":
+      setBanner(`PHONE NEEDS A TAP: ${m.reason || "screen capture consent was cleared"}`, "error");
+      break;
+    case "rotated":
+      log(`rotated to ${m.rot}°, now ${m.out}`, "sys");
+      break;
+    case "stopped":
+    case "stopped_by_user":
+      setBanner("screen sharing stopped on the phone", "closed");
+      break;
+    default:
       break;
   }
 }
@@ -460,6 +490,22 @@ const TAP_SLOP = 12;         // css px
 const LONGPRESS_MS = 550;
 const DOUBLETAP_MS = 300;
 
+/** Above this the gesture counts as a drag rather than a press-and-hold. Held
+ *  for 250ms before releasing, which is what Android's own drag handling
+ *  expects before it takes the touch away from the tapped view. */
+const DRAG_HOLD_MS = 250;
+
+/**
+ * TAP_SLOP is in CSS pixels, but the comparison happens in device coordinates.
+ * The two differ by exactly the factor that matters here: a canvas scaled to
+ * 40% of the frame's width means 12 CSS pixels is 30 device pixels, so without
+ * this every drag would be misread as a tap on a scaled canvas.
+ */
+function slopInDevicePx() {
+  const r = el.canvas.getBoundingClientRect();
+  return state.frame && r.width ? (TAP_SLOP * state.frame.w) / r.width : TAP_SLOP;
+}
+
 let drag = null;
 let lastTap = { t: 0, x: 0, y: 0 };
 let longpressTimer = null;
@@ -487,7 +533,7 @@ el.canvas.addEventListener("pointermove", (ev) => {
   drag.last = p;
   const dx = p.x - drag.start.x;
   const dy = p.y - drag.start.y;
-  if (Math.hypot(dx, dy) > (TAP_SLOP * state.frame.w) / el.canvas.getBoundingClientRect().width) {
+  if (Math.hypot(dx, dy) > slopInDevicePx()) {
     drag.moved = true;
     clearTimeout(longpressTimer);
   }
@@ -505,9 +551,13 @@ el.canvas.addEventListener("pointerup", (ev) => {
   const dy = d.last.y - d.start.y;
 
   if (d.moved) {
+    // Long enough before release -> a drag. Short -> a flick/swipe. The
+    // distinction is what separates moving a slider from scrolling a list.
+    const held = dt >= DRAG_HOLD_MS;
     const ms = Math.max(120, Math.min(1500, Math.round(dt)));
-    send({ op: "swipe", x1: d.start.x, y1: d.start.y, x2: d.last.x, y2: d.last.y, ms });
-    log(`swipe ${d.start.x},${d.start.y} -> ${d.last.x},${d.last.y} (${ms}ms)`, "sys");
+    const op = held ? "drag" : "swipe";
+    send({ op, x1: d.start.x, y1: d.start.y, x2: d.last.x, y2: d.last.y, ms });
+    log(`${op} ${d.start.x},${d.start.y} -> ${d.last.x},${d.last.y} (${ms}ms)`, "sys");
     return;
   }
 
@@ -613,7 +663,7 @@ el.textSend.onclick = () => {
 };
 
 const VALID_SCRIPT_OPS = new Set([
-  "tap", "swipe", "longpress", "doubleTap", "key", "text",
+  "tap", "swipe", "drag", "longpress", "doubleTap", "key", "text",
   "global", "find", "script", "quality", "ime",
 ]);
 
