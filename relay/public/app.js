@@ -282,7 +282,10 @@ function onFrame(buf) {
 
   state.frame = { w: header.w | 0, h: header.h | 0, rot: header.rot | 0, seq: header.seq | 0 };
   state.lastFrameAt = performance.now();
-  el.res.textContent = `${state.frame.w}x${state.frame.h}${state.frame.rot ? ` r${state.frame.rot * 90}` : ""}`;
+  // `rot` arrives in degrees already (0/90/180/270). Scaling it again here
+  // displayed "r8100" for a landscape frame.
+  el.res.textContent =
+    `${state.frame.w}x${state.frame.h}` + (state.frame.rot ? ` r${state.frame.rot}` : "");
   el.overlay.textContent = "";
 
   state.pendingBuf = buf.slice(3 + headerLen);
@@ -304,6 +307,7 @@ async function decodeLoop() {
       if (el.canvas.width !== bmp.width || el.canvas.height !== bmp.height) {
         el.canvas.width = bmp.width;
         el.canvas.height = bmp.height;
+        fitCanvas();
       }
       trackFps();
     }
@@ -313,6 +317,43 @@ async function decodeLoop() {
     state.decoding = false;
   }
 }
+
+/**
+ * Sizes the canvas to fit its container while preserving aspect ratio.
+ *
+ * Done in JS rather than with `max-height: 100%` because that percentage does not
+ * reliably resolve for a replaced element inside a centred grid item, and the
+ * failure mode is the canvas rendering taller than the stage -- which on a
+ * projector means the bottom of the phone screen is simply not visible. That is
+ * not a cosmetic bug, it is the demo.
+ *
+ * The intrinsic canvas size stays equal to the decoded frame; only the CSS size
+ * is letterboxed. Tap mapping uses the bounding rect, so it stays correct.
+ */
+function fitCanvas() {
+  const wrap = el.canvas.parentElement;
+  if (!wrap) return;
+  const box = wrap.getBoundingClientRect();
+  if (!box.width || !box.height) return;
+
+  const iw = el.canvas.width || 1;
+  const ih = el.canvas.height || 1;
+  const aspect = iw / ih;
+
+  let w = box.width;
+  let h = w / aspect;
+  if (h > box.height) {
+    h = box.height;
+    w = h * aspect;
+  }
+  el.canvas.style.width = `${Math.max(1, Math.floor(w))}px`;
+  el.canvas.style.height = `${Math.max(1, Math.floor(h))}px`;
+}
+
+if (typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(fitCanvas).observe(el.canvas.parentElement);
+}
+window.addEventListener("resize", fitCanvas);
 
 function trackFps() {
   const now = performance.now();

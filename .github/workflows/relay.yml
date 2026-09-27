@@ -47,6 +47,9 @@ jobs:
       - name: Control-plane end-to-end
         run: node tools/e2e.mjs --url ws://127.0.0.1:8787
 
+      - name: Console browser smoke test
+        run: node tools/console-smoke.mjs --url http://127.0.0.1:8787
+
       # Short by default so CI stays fast. The 30-minute soak is a pre-demo
       # ritual, not something every push needs to pay for.
       - name: Frame relay load

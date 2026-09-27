@@ -148,6 +148,24 @@ async function main() {
   // connected consoles to every phone, so assert it does not happen.
   check("the device list is not broadcast to agents", !a.json.some((m) => m.op === "devices"));
 
+  // ── 2b. a console that connects LATE still sees the device ────────────────
+  // Regression guard. The device list is only broadcast on agent connect and on
+  // hello, so without an explicit snapshot on console connect a console opened
+  // after the phone is already enrolled shows an empty list forever. That is
+  // exactly the demo-day ordering.
+  console.log("\n2b. Late console discovery");
+  {
+    const late = await open(
+      `${BASE}/ws/console?token=${encodeURIComponent(CONSOLE_TOKEN)}&cid=${crypto.randomUUID()}`
+    );
+    const lc = collect(late);
+    await sleep(400);
+    const seen = lc.json.find((m) => m.op === "devices")?.devices?.find((d) => d.id === DEVICE);
+    check("a console connecting after the phone still gets the device list", !!seen,
+      JSON.stringify(lc.json));
+    late.close();
+  }
+
   // ── 3. pairing ─────────────────────────────────────────────────────────────
   console.log("\n3. Pairing");
   c.clear(); a.clear();

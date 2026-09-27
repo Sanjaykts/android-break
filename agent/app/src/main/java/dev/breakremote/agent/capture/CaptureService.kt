@@ -24,6 +24,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
@@ -93,6 +94,13 @@ class CaptureService : Service() {
     private var rawW = 0
     private var rawH = 0
     @Volatile private var rotation = Surface.ROTATION_0
+
+    /** Cached handle so the per-frame rotation check is a field read, not a
+     *  service lookup. */
+    private var display: Display? = null
+    private var dstW = 0
+    private var dstH = 0
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -179,8 +187,11 @@ class CaptureService : Service() {
         srcBitmap = Bitmap.createBitmap(capW, capH, Bitmap.Config.ARGB_8888)
         pixels = IntArray(capW * capH)
         rowScratch = ByteArray(capW * 4)
-        dstBitmap = Bitmap.createBitmap(displayW(), displayH(), Bitmap.Config.ARGB_8888)
+        dstW = displayW()
+        dstH = displayH()
+        dstBitmap = Bitmap.createBitmap(dstW, dstH, Bitmap.Config.ARGB_8888)
 
+        acquireWakeLock()
         startLoop()
         running = true
         isCapturing = true
@@ -229,6 +240,7 @@ class CaptureService : Service() {
     private fun captureOnce() {
         val imageReader = reader ?: return
         val src = srcBitmap ?: return
+        syncRotation()
         val dst = dstBitmap ?: return
 
         var image: Image? = null
@@ -331,11 +343,62 @@ class CaptureService : Service() {
 
     private fun displayGeometry(): Triple<Int, Int, Int> {
         val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-        val display = dm.getDisplay(Display.DEFAULT_DISPLAY)
-        val rot = display?.rotation ?: Surface.ROTATION_0
-        val pw = display?.mode?.physicalWidth ?: 1080
-        val ph = display?.mode?.physicalHeight ?: 1920
+        val d = dm.getDisplay(Display.DEFAULT_DISPLAY)
+        display = d
+        val rot = d?.rotation ?: Surface.ROTATION_0
+        val pw = d?.mode?.physicalWidth ?: 1080
+        val ph = d?.mode?.physicalHeight ?: 1920
         return Triple(pw, ph, rot)
+    }
+
+    /**
+     * Picks up a rotation change.
+     *
+     * The VirtualDisplay always produces the raw panel, which does not change
+     * with rotation -- so the capture buffers stay valid and only the transform
+     * and the advertised display space change. That means a rotation mid-demo
+     * costs one small reallocation rather than a dropped projection, and without
+     * this the header's w/h go stale and every tap lands in the wrong place.
+     */
+    private fun syncRotation(): Boolean {
+        val current = display?.rotation ?: return false
+        if (current == rotation) return false
+        rotation = current
+        val w = displayW()
+        val h = displayH()
+        if (w != dstW || h != dstH) {
+            dstW = w
+            dstH = h
+            if (w > 0 && h > 0) {
+                dstBitmap?.recycle()
+                dstBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                canvas.setBitmap(null)
+            }
+        }
+        Log.i(TAG, "rotation changed to ${rotationDegrees()}deg; display space is now ${dstW}x$dstH")
+        Session.sendEvent("capture", JSONObject()
+            .put("state", "rotated")
+            .put("rot", rotationDegrees())
+            .put("out", "$dstW x $dstH".replace(" ", "")))
+        return true
+    }
+
+    /**
+     * A partial wakelock keeps the CPU between frames so the encoder holds its
+     * target rate. It does **not** keep the screen on -- nothing an app can do
+     * prevents the display timeout, which is why the enrollment screen walks the
+     * owner through Screen timeout -> 30 minutes instead of pretending otherwise.
+     */
+    private fun acquireWakeLock() {
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "brk:capture").apply {
+                setReferenceCounted(false)
+                acquire(10 * 60 * 60 * 1000L)
+            }
+        } catch (_: Exception) {
+            // A missing wakelock costs frame rate, not correctness.
+        }
     }
 
     private fun rotationDegrees(): Int = when (rotation) {
@@ -503,6 +566,12 @@ class CaptureService : Service() {
         }
         projectionCallback = null
         projection = null
+        try {
+            wakeLock?.let { if (it.isHeld) it.release() }
+        } catch (_: Exception) {
+            // Already released.
+        }
+        wakeLock = null
         srcBitmap = null
         dstBitmap = null
         jpegSink.reset()

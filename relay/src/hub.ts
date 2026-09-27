@@ -97,6 +97,12 @@ export class Hub extends DurableObject<Env> {
     }
     return this.accept([TAG_CONSOLE, CONSOLE_TAG(consoleId)], (server) => {
       server.serializeAttachment({ consoleId, deviceId: null } satisfies ConsoleAttachment);
+      // A console that connects *after* the phone is already enrolled would
+      // otherwise sit on an empty list forever, because the only other trigger
+      // for a device list is an agent connecting. That is precisely the demo-day
+      // ordering: phone enrolled hours earlier, laptop opened at talk time.
+      this.metaCache = null;
+      this.broadcastDevices();
     });
   }
 
