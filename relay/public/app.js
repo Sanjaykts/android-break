@@ -63,6 +63,10 @@ const state = {
   qualityIdx: 0,
   lastQualityChange: 0,
   cameraOn: false,
+  fpsValue: 0,
+  caption: "",
+  commandLog: [],
+  tapMark: null,
   recorder: null,
   recChunks: [],
   sendQueue: Promise.resolve(),
@@ -152,9 +156,37 @@ function connect() {
   };
 }
 
+/** Human-readable one-liners for the recorded command log. */
+function describe(msg) {
+  switch (msg.op) {
+    case "tap": return `tap ${msg.x}, ${msg.y}`;
+    case "swipe": return `swipe ${msg.x1},${msg.y1} → ${msg.x2},${msg.y2}`;
+    case "drag": return `drag ${msg.x1},${msg.y1} → ${msg.x2},${msg.y2}`;
+    case "longpress": return `long press ${msg.x}, ${msg.y}`;
+    case "doubleTap": return `double tap ${msg.x}, ${msg.y}`;
+    case "key": return `key ${msg.code}`;
+    case "text": return `type "${(msg.s || "").slice(0, 28)}"`;
+    case "global": return `${msg.action} (global)`;
+    case "find": return `find "${msg.text}" → ${msg.action}`;
+    case "script": return `script, ${msg.actions?.length ?? 0} steps`;
+    case "quality": return `quality ${msg.w}p / ${msg.fps}fps`;
+    case "ime": return `ime fallback ${msg.enabled ? "on" : "off"}`;
+    case "connect": return `connect ${msg.id}`;
+    case "disconnect": return "disconnect";
+    default: return msg.op;
+  }
+}
+
 /** Serialised so the wire never sees two commands interleaved, which the phone's
  *  gesture serialiser would otherwise have to unpick. */
 function send(msg, immediate = false) {
+  if (msg.op && msg.op !== "ping" && msg.op !== "disconnect") {
+    state.commandLog.push(describe(msg));
+    if (state.commandLog.length > 60) state.commandLog.shift();
+  }
+  if (msg.op === "tap" || msg.op === "doubleTap" || msg.op === "longpress") {
+    state.tapMark = { x: msg.x, y: msg.y, until: performance.now() + 520 };
+  }
   const go = () => {
     if (state.ws?.readyState === WebSocket.OPEN) state.ws.send(JSON.stringify(msg));
   };
@@ -393,6 +425,7 @@ function trackFps() {
     ? (state.frameTimes[state.frameTimes.length - 1] - state.frameTimes[0]) / 1000
     : 0;
   const fps = span > 0 ? (state.frameTimes.length - 1) / span : 0;
+  state.fpsValue = fps;
   el.fps.textContent = `${fps.toFixed(1)} fps`;
   el.fps.className = `badge ${fps >= 7 ? "good" : fps >= 3 ? "warn" : "bad"}`;
   maybeAdaptQuality(fps);
@@ -451,6 +484,8 @@ function renderLoop() {
   // One loop drives both the screen and the presenter camera, so the camera ends
   // up inside the recorded file rather than floating over it.
   if (state.lastBitmap) ctx.drawImage(state.lastBitmap, 0, 0);
+
+  drawPresentation();
 
   if (state.cameraOn && el.cam.videoWidth) {
     const w = Math.round(el.canvas.width * 0.26);
@@ -700,6 +735,112 @@ el.scriptRun.onclick = async () => {
   log("script: done", "ok");
 };
 
+// ────────────────────────────────────────────── presentation canvas ──
+//
+// Recording the stage canvas captures the phone screen and nothing else: at
+// 480x854 there is no console UI, no command log, no caption, and no indication
+// of *remote* control -- which is the entire claim the demo makes. A fallback
+// video has to show the laptop driving the phone, so the recorder composites a
+// 16:9 frame containing the screen, a live command log, and a caption.
+//
+// This canvas is never displayed. It exists to be captured.
+
+const present = document.createElement("canvas");
+present.width = 1280;
+present.height = 720;
+const pctx = present.getContext("2d", { alpha: false });
+
+function drawPresentation() {
+  const W = present.width;
+  const H = present.height;
+  pctx.fillStyle = "#0a0d11";
+  pctx.fillRect(0, 0, W, H);
+
+  // ── the phone screen, on the left ──
+  const padTop = 58;
+  const padBottom = 96;
+  const availH = H - padTop - padBottom;
+  const availW = Math.round(availH * (state.frame ? state.frame.w / state.frame.h : 480 / 854));
+  const px = 56;
+  const py = padTop;
+  if (state.lastBitmap) {
+    pctx.drawImage(state.lastBitmap, px, py, availW, availH);
+  } else {
+    pctx.fillStyle = "#12181f";
+    pctx.fillRect(px, py, availW, availH);
+  }
+  pctx.strokeStyle = "#2a343f";
+  pctx.lineWidth = 2;
+  pctx.strokeRect(px + 1, py + 1, availW - 2, availH - 2);
+
+  // ── a tap marker, so the audience can see where input landed ──
+  if (state.tapMark && performance.now() < state.tapMark.until) {
+    const t = 1 - (state.tapMark.until - performance.now()) / 520;
+    const r = 14 + t * 26;
+    pctx.beginPath();
+    pctx.arc(px + (state.tapMark.x / state.frame.w) * availW,
+             py + (state.tapMark.y / state.frame.h) * availH, r, 0, Math.PI * 2);
+    pctx.strokeStyle = `rgba(74,222,128,${Math.max(0, 0.9 - t)})`;
+    pctx.lineWidth = 3;
+    pctx.stroke();
+  }
+
+  // ── right panel: what the laptop is doing ──
+  const rx = px + availW + 40;
+  const rw = W - rx - 56;
+  pctx.fillStyle = "#e6edf3";
+  pctx.font = "600 21px -apple-system, 'Segoe UI', Roboto, sans-serif";
+  pctx.fillText("Break Remote console", rx, 46);
+
+  pctx.fillStyle = "#4ade80";
+  pctx.font = "500 15px ui-monospace, Menlo, monospace";
+  pctx.fillText(`● LIVE  ${state.pairedId || "—"}`, rx, 72);
+
+  pctx.fillStyle = "#8b98a5";
+  pctx.font = "13px ui-monospace, Menlo, monospace";
+  const stats = [
+    `res    ${state.frame ? state.frame.w + "x" + state.frame.h : "—"}`,
+    `rtt    ${state.rtt == null ? "—" : Math.round(state.rtt) + " ms"}`,
+    `fps    ${state.fpsValue.toFixed(1)}`,
+    `mode   ${state.qualityMode}`,
+  ];
+  stats.forEach((line, i) => pctx.fillText(line, rx, 116 + i * 22));
+
+  pctx.fillStyle = "#8b98a5";
+  pctx.font = "600 12px -apple-system, sans-serif";
+  pctx.fillText("COMMANDS FROM THE LAPTOP", rx, 240);
+  pctx.font = "14px ui-monospace, Menlo, monospace";
+  const recent = state.commandLog.slice(-11);
+  recent.forEach((c, i) => {
+    pctx.fillStyle = "#c9d4de";
+    pctx.fillText(c, rx, 266 + i * 21);
+  });
+
+  // ── presenter camera, bottom right of the panel ──
+  if (state.cameraOn && el.cam.videoWidth) {
+    const cw = 190;
+    const ch = Math.round((cw * el.cam.videoHeight) / el.cam.videoWidth);
+    const cx = W - cw - 56;
+    const cy = H - ch - 120;
+    pctx.save();
+    pctx.translate(cx + cw, cy);
+    pctx.scale(-1, 1);
+    pctx.drawImage(el.cam, 0, 0, cw, ch);
+    pctx.restore();
+  }
+
+  // ── caption bar ──
+  pctx.fillStyle = "#11161d";
+  pctx.fillRect(0, H - padBottom + 20, W, padBottom - 20);
+  pctx.fillStyle = "#2a343f";
+  pctx.fillRect(0, H - padBottom + 20, W, 1);
+  if (state.caption) {
+    pctx.fillStyle = "#e6edf3";
+    pctx.font = "22px -apple-system, 'Segoe UI', Roboto, sans-serif";
+    pctx.fillText(state.caption, 56, H - 40);
+  }
+}
+
 // ────────────────────────────────────────────────── camera and recording ──
 
 async function startCamera() {
@@ -742,7 +883,9 @@ function pickMime() {
 function startRecording() {
   if (!state.lastBitmap) { log("record: no frames yet", "err"); return; }
   try {
-    const stream = el.canvas.captureStream(30);
+    // Capture the presentation canvas, not the stage: the stage alone is a bare
+    // 480x854 phone screen with no evidence that it is being driven remotely.
+    const stream = present.captureStream(30);
     const mime = pickMime();
     const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 4_000_000 } : undefined);
     state.recChunks = [];
@@ -807,4 +950,12 @@ if (!state.token) {
 } else {
   connect();
 }
+/**
+ * Lets the prerecorded-video tool (tools/record-demo.mjs) set the caption that
+ * appears in the recording. Deliberately tiny and additive: captions are
+ * narration, not a feature of the control path.
+ */
+window.brkCaption = (text) => { state.caption = text || ""; };
+window.brkPresentSize = () => ({ w: present.width, h: present.height });
+
 log("console ready");

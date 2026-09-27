@@ -224,8 +224,11 @@ async function main() {
         const v = document.querySelector("video");
         return v ? { w: v.videoWidth, h: v.videoHeight } : null;
       });
-      check("the recording is the size of the stage canvas", dims?.w === 480 && dims?.h === 854,
-        JSON.stringify(dims));
+      // Recording captures the presentation canvas, not the stage: the stage
+      // alone is a bare 480x854 phone screen with nothing showing that it is
+      // being driven remotely.
+      check("the recording is the presentation canvas, not the bare stage",
+        dims?.w === 1280 && dims?.h === 720, JSON.stringify(dims));
       await play.close();
 
       console.log(`  wrote ${path.join(DOWNLOAD_DIR, webm)} (${(buf.length / 1024).toFixed(0)} KB)`);

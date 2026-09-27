@@ -19,10 +19,32 @@ start, and treating it that way is what makes it usable without hesitation.
 
 ---
 
+## 1a. Run the gate
+
+```bash
+./demo-freeze.sh
+```
+
+It re-runs every automated check and then verifies the things that are easy to
+skip: that `demo.mp4` exists and is not a placeholder, that the relay is live,
+that the install link still resolves, and that the enrollment sheet has no
+unfilled screenshot gaps.
+
+**It fails while `demo.mp4` is missing.** That is deliberate. The fallback ladder
+has to be complete before you are on stage, and the only reliable time to discover
+it is incomplete is before you are on stage.
+
+It also prints a manual checklist. Nothing on that list can be verified from a
+laptop -- it needs you and the phone.
+
+Once it passes: **freeze. No code changes.** Write down anything you find and fix
+it after the demo.
+
 ## 2. The night before
 
 - [ ] `demo.mp4` exists, plays, and is the right build. **Non-negotiable.**
 - [ ] `./demo-preflight.sh` passes from a cold start.
+- [ ] `./demo-freeze.sh` passes.
 - [ ] Read §6, the five hard questions, out loud, twice. They are the part of the
       demo you are actually being assessed on.
 - [ ] Decide who talks and who drives. One voice. Do not pass the laptop around.
@@ -39,6 +61,19 @@ start, and treating it that way is what makes it usable without hesitation.
       screen timeout 30 min, battery Unrestricted.
 - [ ] Verify from the laptop: the phone appears in the console, live view flows.
 - [ ] Run one full rehearsal at your desk, timed. Under 4 minutes.
+      `./check-all.sh` is not a rehearsal. This is:
+      ```
+      cd relay && node tools/rehearse.mjs --url $RELAY_URL --device <device-id>
+      ```
+      It drives the console through all six beats on a timer and tells you which
+      beat ran long. It works against a synthetic phone before the device exists,
+      and against the real device with `--device`, and the choreography is
+      identical in both -- so the path you practise is the path you perform.
+- [ ] Record the fallback video, once, on the real phone:
+      ```
+      cd relay && node tools/record-demo.mjs --url $RELAY_URL --device <device-id>
+      ```
+      Output is `demo.mp4`. Play it once, end to end, before you rely on it.
 - [ ] **Freeze. No code changes from here.** If something is wrong, it is a
       rehearsal finding for after the demo, not a change to make now.
 
@@ -141,6 +176,21 @@ the moment.
 | Frame rate collapses | The console has already stepped quality down automatically. Say "it's adapting to the network." That is the feature working | Touch the quality control |
 | Venue wifi is blocking WebSockets | The phone's own 4G is the fallback and it is independent of the venue. If the *laptop* cannot reach the relay, switch the laptop to a hotspot | Debug the venue network |
 | The phone owner is visibly uncomfortable | Stop. Hand it back. Offer the video | Push on |
+
+### Before the day
+
+The 30-minute stability requirement (definition of done item 4) has to be run
+against the real handset, because what breaks in 30 minutes is phone-side: the OEM
+battery manager killing a background service, MediaProjection consent being
+revoked, the encoder drifting, the socket dropping on a moving network.
+
+```
+cd relay && node tools/soak-device.mjs --url $RELAY_URL --device <device-id> --minutes 30
+```
+
+Leave the phone on 4G, screen on, untouched. It refuses to count a synthetic
+device as a pass, and it tells you to re-run if the screen slept rather than
+letting you blame the app for a timeout you can fix in Settings.
 
 The console's fallback ladder, in order:
 

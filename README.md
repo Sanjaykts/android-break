@@ -142,6 +142,35 @@ npm run smoke      # 27 checks: real headless Chrome against the real console
 npm run loadtest   # sustained frame relay
 ```
 
+One command runs all of it:
+
+```bash
+./check-all.sh          # android build + 4 relay suites
+./check-all.sh --quick  # skip the 30s load test
+```
+
+Phase 5 tooling, for rehearsing and freezing:
+
+```bash
+cd relay
+node tools/rehearse.mjs --url <relay>                    # all 6 beats, on a timer
+node tools/rehearse.mjs --url <relay> --device <id>      # same, against the real phone
+node tools/record-demo.mjs --url <relay> --device <id>   # writes demo.mp4
+node tools/record-demo.mjs --url <relay> --rehearsal     # mock phone, NOT the fallback
+node tools/soak-device.mjs --url <relay> --device <id> --minutes 30
+```
+
+`rehearse.mjs` works against a synthetic phone before a device exists and against
+the real device afterwards, with identical choreography, so the first run on real
+hardware is not also the first run of the code. `soak-device.mjs` is the
+definition-of-done stability test, and it deliberately refuses to count a
+synthetic device as a pass.
+
+From the repo root, `./demo-freeze.sh` re-runs every check and then verifies the
+things a laptop cannot see -- `demo.mp4` existing and not being a placeholder, the
+relay being live, the install link resolving, and the enrollment sheet having no
+unfilled gaps. It fails while `demo.mp4` is missing, on purpose.
+
 Measured on a MacBook, local relay:
 
 - **30-minute soak:** 17,818 frames, 731 MB, **100% delivery, zero drops**

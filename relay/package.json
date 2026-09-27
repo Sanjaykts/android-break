@@ -11,7 +11,10 @@
     "loadtest": "node tools/loadtest.mjs",
     "e2e": "node tools/e2e.mjs",
     "smoke": "node tools/console-smoke.mjs",
-    "record": "node tools/record-smoke.mjs"
+    "record": "node tools/record-smoke.mjs",
+    "rehearse": "node tools/rehearse.mjs",
+    "record-demo": "node tools/record-demo.mjs",
+    "soak": "node tools/soak-device.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260926.1",

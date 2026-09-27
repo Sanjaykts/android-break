@@ -1,0 +1,5 @@
+# Recorder output. A real demo.mp4 lives at the repo root; captures produced while
+# rehearsing against a mock phone must never be committed, because the fallback
+# ladder depends on demo.mp4 being the real thing.
+capture/
+*.webm
