@@ -158,7 +158,19 @@ async function main() {
 
     // ── 2. pair and get frames ──────────────────────────────────────────────
     console.log("\n2. Pairing and frame decode");
-    await page.click("#device-list .device");
+    // Click *our* device, not simply the first one. This suite runs after the
+    // e2e suite in CI, which leaves its own device connected, and clicking the
+    // first row would pair with the wrong phone -- after which every frame is
+    // filtered out as "not mine" and the rest of the run fails for no visible
+    // reason.
+    const paired = await page.evaluate((id) => {
+      const rows = [...document.querySelectorAll("#device-list .device")];
+      const target = rows.find((r) => (r.querySelector(".meta")?.textContent || "").includes(id));
+      if (!target) return null;
+      target.click();
+      return target.querySelector(".name")?.textContent;
+    }, DEVICE);
+    check(`pairing with the right device in a populated list`, paired !== null, `looked for ${DEVICE}`);
     await page.waitForFunction(
       () => !document.querySelector("#screen-stage").classList.contains("hidden"),
       { timeout: 5000 }

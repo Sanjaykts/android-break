@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Set up Break Remote on your phone</title>
+<style>
+  /* Print-oriented: A4, generous type, high contrast. This gets read on a phone
+     screen by someone who is not a developer and is mildly nervous about
+     installing an APK, so it must be legible without zooming. */
+  @page { size: A4; margin: 16mm; }
+
+  body {
+    font: 12pt/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
+    color: #111;
+    max-width: 190mm;
+    margin: 0 auto;
+  }
+
+  h1 { font-size: 22pt; margin: 0 0 2mm; letter-spacing: -0.2pt; }
+  h2 {
+    font-size: 13pt;
+    margin: 8mm 0 3mm;
+    padding-bottom: 1.5mm;
+    border-bottom: 1.5pt solid #111;
+  }
+  .sub { color: #555; margin: 0 0 6mm; font-size: 11pt; }
+  .page-break { page-break-before: always; }
+
+  .qr { text-align: center; margin: 6mm 0; }
+  .qr img { width: 55mm; height: 55mm; }
+  .url {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 9.5pt;
+    word-break: break-all;
+    background: #f2f2f2;
+    padding: 3mm 4mm;
+    border-radius: 2mm;
+  }
+
+  ol { padding-left: 6mm; margin: 2mm 0; }
+  li { margin-bottom: 2.5mm; }
+
+  .step {
+    display: flex;
+    gap: 4mm;
+    margin: 4mm 0;
+    page-break-inside: avoid;
+  }
+  .num {
+    flex: none;
+    width: 9mm; height: 9mm;
+    border-radius: 50%;
+    background: #111; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 11pt;
+  }
+  .body { flex: 1; }
+  .body strong { display: block; margin-bottom: 1mm; font-size: 12.5pt; }
+
+  /* Screenshot slots. Left deliberately visible and labelled so it is impossible
+     to ship this sheet with an empty gap someone will read as a bug. */
+  .shot {
+    border: 1pt dashed #999;
+    border-radius: 2mm;
+    padding: 8mm 4mm;
+    text-align: center;
+    color: #777;
+    font-size: 10pt;
+    background: #fafafa;
+    margin: 3mm 0 5mm;
+  }
+  .shot img { max-width: 100%; border-radius: 1mm; }
+  .shot b { display: block; color: #555; margin-bottom: 2mm; }
+
+  table { width: 100%; border-collapse: collapse; margin: 3mm 0; }
+  th, td { text-align: left; padding: 2.5mm 3mm; border-bottom: 0.75pt solid #ddd; vertical-align: top; }
+  th { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.4pt; color: #555; }
+  td.yes { color: #0a7a34; font-weight: 600; }
+  td.no  { color: #b42318; font-weight: 600; }
+
+  .note {
+    background: #f6f6f6;
+    border-left: 2.5pt solid #111;
+    padding: 3mm 4mm;
+    margin: 4mm 0;
+    font-size: 11pt;
+  }
+  .warn { border-left-color: #b42318; }
+  footer { margin-top: 10mm; font-size: 9.5pt; color: #777; border-top: 0.75pt solid #ddd; padding-top: 3mm; }
+</style>
+</head>
+<body>
+
+<h1>Set up Break Remote</h1>
+<p class="sub">Three permissions, about four minutes. You can undo all of it in two taps at any time.</p>
+
+<h2>1 · Install the app</h2>
+
+<div class="qr">
+  <!-- {{QR_IMAGE}} -->
+  <b>Scan with your phone's camera</b>
+  <img src="{{QR_PATH}}" alt="QR code linking to the app download" />
+</div>
+
+<p class="url">{{APK_URL}}</p>
+
+<ol>
+  <li>Open the link in Chrome. It downloads a file called <code>agent.apk</code>.</li>
+  <li>If Chrome asks to allow downloads from itself, tap <strong>Allow</strong>.</li>
+  <li>Tap the downloaded file, then <strong>Install</strong>.</li>
+  <li>Google Play Protect will warn you that the developer is unknown. Tap
+      <strong>More details</strong>, then <strong>Install anyway</strong>.</li>
+  <li>Open the app.</li>
+</ol>
+
+<div class="note">
+  <strong>Why does it ask to install from an unknown source?</strong><br />
+  Because it is not in the Play Store. It is distributed from a public link so you
+  install it yourself rather than handing your phone to someone else. You are about
+  to grant it three permissions that let it see and control your screen — read the
+  next page before you agree to anything.
+</div>
+
+<h2 class="page-break">2 · The three permissions</h2>
+
+<p>Open the app. It shows three rows. Each one turns green as you do it. It will not
+say <strong>Ready</strong> until all three are done.</p>
+
+<div class="step">
+  <div class="num">1</div>
+  <div class="body">
+    <strong>Accessibility</strong>
+    Tap <strong>Set</strong> next to "Turn on Accessibility", find
+    <strong>Break Remote Control</strong> in the list, and turn it on.
+    <div class="shot">
+      <b>{{SHOT_ACCESSIBILITY}}</b>
+      Replace with a screenshot of the Accessibility list on this phone
+    </div>
+    <strong>Why:</strong> this is how a tap on the laptop becomes a real tap on your
+    screen. No other app can do this unless it is installed by the phone's
+    manufacturer. This app cannot use the "normal" way, because that is reserved for
+    system apps.
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">2</div>
+  <div class="body">
+    <strong>Screen sharing</strong>
+    Tap <strong>Set</strong> next to "Allow screen sharing". Android shows a system
+    dialog — tap <strong>Start now</strong> or <strong>Begin capturing</strong>.
+    <div class="shot">
+      <b>{{SHOT_CAPTURE}}</b>
+      Replace with a screenshot of the system capture dialog on this phone
+    </div>
+    <strong>Why:</strong> this is what puts your screen on the laptop. Android only
+    ever allows this with your explicit OK, and it only lasts until you restart the
+    phone — after a restart you will need to tap this again.
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">3</div>
+  <div class="body">
+    <strong>Notifications</strong>
+    Tap <strong>Set</strong> and allow notifications.
+    <div class="shot">
+      <b>{{SHOT_NOTIFICATIONS}}</b>
+      Replace with a screenshot of the notification permission dialog
+    </div>
+    <strong>Why:</strong> while your screen is being shared, Android requires a
+    permanent notification and will not let the app hide it. Allowing notifications
+    is what makes sure you can actually <em>see</em> it. An app that shares your
+    screen without showing a visible notification would be the thing worth worrying
+    about, so this one is on purpose.
+  </div>
+</div>
+
+<div class="note">
+  <strong>Two settings that are not permissions but matter</strong><br />
+  <strong>Screen timeout → 30 minutes</strong>, and <strong>Battery → Unrestricted</strong>.
+  Some phones turn the screen off or kill background apps after a few minutes, which
+  would stop the connection mid-use. The app links to both settings screens for you.
+</div>
+
+<h2 class="page-break">3 · What you have agreed to</h2>
+
+<table>
+  <tr><th>It can</th><th>It cannot</th></tr>
+  <tr>
+    <td>Show your screen on a laptop</td>
+    <td>Read your messages, WhatsApp, or email</td>
+  </tr>
+  <tr>
+    <td>Tap, swipe and type on your screen</td>
+    <td>Read your photos, files or contacts</td>
+  </tr>
+  <tr>
+    <td>Notice when you touch the phone yourself</td>
+    <td>Use your phone while the screen is locked</td>
+  </tr>
+  <tr>
+    <td>Work while you use the phone normally</td>
+    <td>Hide that it is running — the notification is permanent</td>
+  </tr>
+  <tr>
+    <td>Reconnect by itself after a dropped connection</td>
+    <td>Stop you uninstalling it</td>
+  </tr>
+</table>
+
+<div class="note">
+  <strong>The honest limit:</strong> this works by seeing the same screen you see.
+  It has no special access to anything. It is closer to someone looking over your
+  shoulder with their hands on your phone than to a spy tool.
+</div>
+
+<p>While it is running you will always see:</p>
+<ul>
+  <li>a permanent notification saying your screen is being controlled</li>
+  <li>an entry in <strong>Settings → Accessibility</strong> that you can switch off</li>
+</ul>
+
+<p>To switch it off: turn off <strong>Break Remote Control</strong> in
+Settings → Accessibility, or swipe the notification away.
+To remove it completely: <strong>Settings → Apps → Break Remote</strong> →
+Uninstall. Nothing is left behind.</p>
+
+<div class="note warn">
+  <strong>If anyone asks you to install this on your phone and you do not
+  understand why, do not.</strong> Remote control software is a genuine security
+  risk when it is installed without the owner knowing. The only safe version of this
+  is the one you set up yourself, on your own phone, and can switch off yourself.
+</div>
+
+<footer>
+  Break Remote — consent-based remote support. Nothing is stored: screen images
+  pass through the relay and are never written down. Questions during setup are
+  welcome; they are the point.
+</footer>
+
+</body>
+</html>
