@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Break Remote — Console</title>
+<link rel="stylesheet" href="/style.css" />
+<link rel="icon" href="data:," />
+</head>
+<body>
+
+<!-- ─────────────────────────────  devices  ───────────────────────────── -->
+<section id="screen-devices" class="screen">
+  <div class="panel">
+    <h1>Break Remote</h1>
+    <p class="sub">Pick the phone to control.</p>
+
+    <label class="field">
+      <span>Console token</span>
+      <input id="token-input" type="password" autocomplete="off" spellcheck="false" placeholder="console token" />
+    </label>
+
+    <div id="device-list" class="device-list">
+      <p class="empty">Connecting to relay…</p>
+    </div>
+
+    <p id="relay-status" class="relay-status">relay: connecting</p>
+  </div>
+</section>
+
+<!-- ──────────────────────────────  stage  ────────────────────────────── -->
+<section id="screen-stage" class="screen hidden">
+
+  <div id="banner" class="banner"></div>
+
+  <div class="stage-wrap">
+    <canvas id="stage"></canvas>
+    <video id="cam" class="cam hidden" playsinline muted autoplay></video>
+    <div id="stage-overlay" class="stage-overlay">waiting for frames…</div>
+  </div>
+
+  <!-- global navigation -->
+  <div class="nav-bar">
+    <button data-global="back"     title="Android back">&#8592; Back</button>
+    <button data-global="home"     title="Home">Home</button>
+    <button data-global="recents"  title="Recent apps">Recents</button>
+    <button data-global="appswitch" title="App switch">Apps</button>
+    <button data-global="notifications" title="Notification shade">Notifs</button>
+    <button data-global="power"    title="Power menu">Power</button>
+  </div>
+
+  <div class="side">
+    <div class="row">
+      <span class="badge" id="latency">rtt —</span>
+      <span class="badge" id="fps">— fps</span>
+      <span class="badge" id="res">—</span>
+      <button id="quality-btn" class="mini" title="Cycle capture quality">quality: auto</button>
+    </div>
+
+    <label class="field">
+      <span>Tap button labelled</span>
+      <div class="inline">
+        <input id="find-input" type="text" placeholder="e.g. Sign in" spellcheck="false" />
+        <button id="find-click" class="mini">tap</button>
+        <button id="find-type" class="mini">type</button>
+      </div>
+    </label>
+
+    <label class="field">
+      <span>Type text</span>
+      <div class="inline">
+        <input id="text-input" type="text" placeholder="focus here, then type" spellcheck="false" />
+        <button id="text-send" class="mini">send</button>
+      </div>
+    </label>
+
+    <label class="field">
+      <span>Script (JSON action list)</span>
+      <textarea id="script-input" rows="5" spellcheck="false"
+>[{"op":"global","action":"home"},
+ {"op":"find","text":"Settings","action":"click"}]</textarea>
+      <button id="script-run" class="mini wide">run script</button>
+    </label>
+
+    <div class="row">
+      <button id="rec-btn" class="mini">&#9679; Record</button>
+      <button id="cam-btn" class="mini">Presenter cam</button>
+      <button id="fs-btn" class="mini">Fullscreen</button>
+      <button id="back-btn" class="mini">Devices</button>
+    </div>
+
+    <div class="log-head">
+      <span>Action log</span>
+      <button id="log-clear" class="mini">clear</button>
+    </div>
+    <div id="log" class="log"></div>
+  </div>
+</section>
+
+<script src="/app.js" type="module"></script>
+</body>
+</html>

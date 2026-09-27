@@ -1,0 +1,33 @@
+# --- Secrets: never commit ---
+*.jks
+*.keystore
+keystore.properties
+local.properties
+.env
+.env.*
+!.env.example
+
+# --- Android build output ---
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+.cxx/
+
+# --- Cloudflare / Node ---
+node_modules/
+.wrangler/
+dist/
+.dev.vars
+
+# --- Demo artefacts (large binaries, regenerate from source) ---
+*.mp4
+*.webm
+tools/out/
+
+# --- macOS ---
+.DS_Store

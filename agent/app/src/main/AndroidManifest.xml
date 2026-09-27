@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      Network: the agent makes exactly one outbound WSS connection to our Worker.
+      There is no analytics, no third-party SDK, and no other endpoint.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
+      Foreground service: screen capture is unsuppressible on Android 10+, and that
+      visible notification is deliberate. It is the consent made continuous.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+
+    <!--
+      API 33+. The foreground service runs either way, but without this the
+      notification is hidden and we lose the visible-consent guarantee the
+      whole security posture rests on. Requested during enrollment.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!--
+      NOTE: android.permission.BIND_ACCESSIBILITY_SERVICE and BIND_INPUT_METHOD are
+      signature-level permissions declared on the <service> element below, not here.
+      Adding them as <uses-permission> is inert.
+
+      Deliberately absent: SYSTEM_ALERT_WINDOW, QUERY_ALL_PACKAGES, INSTALL_PACKAGES,
+      READ_SMS / READ_CONTACTS / CAMERA / RECORD_AUDIO, device-admin. We drive the
+      screen the user already sees; we do not read their data.
+    -->
+
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BreakRemote"
+        tools:targetApi="34">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="behind"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          The whole input model lives here. INJECT_EVENTS is signature-only and
+          unattainable by a sideloaded app, so AccessibilityService.dispatchGesture
+          is the only path from laptop input to real touch events.
+        -->
+        <service
+            android:name=".control.ControlService"
+            android:exported="true"
+            android:label="@string/accessibility_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_config" />
+        </service>
+
+        <!--
+          Screen capture. foregroundServiceType="mediaProjection" is mandatory from
+          API 29 and the notification cannot be suppressed. On API 34+ the service
+          MUST call startForeground() before getMediaProjection() returns, and the
+          MediaProjection.Callback MUST be registered before createVirtualDisplay().
+        -->
+        <service
+            android:name=".capture.CaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
+        <!-- Optional typing fallback for WebViews and games where ACTION_SET_TEXT fails. -->
+        <service
+            android:name=".input.AgentImeService"
+            android:exported="true"
+            android:label="@string/ime_label"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
+        </service>
+
+        <!--
+          Reboot recovery. This receiver deliberately does NOT start CaptureService:
+          on API 34+ starting a mediaProjection foreground service without a live
+          MediaProjection throws, and consent can never be re-acquired silently.
+          It restores the relay session and posts a one-tap re-consent notification.
+        -->
+        <receiver
+            android:name=".BootReceiver"
+            android:directBootAware="false"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

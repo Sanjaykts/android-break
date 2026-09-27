@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Break Remote</string>
+
+    <string name="accessibility_label">Break Remote Control</string>
+    <string name="accessibility_description">Lets Break Remote turn commands from your laptop into taps, swipes and typing on this screen, and to read the screen so it can be shown live. It cannot read your messages, photos or files.</string>
+
+    <string name="ime_label">Break Remote Typing</string>
+</resources>

@@ -1,0 +1,134 @@
+name: build
+
+# Plan section 7.2: every push to main produces a signed, downloadable APK at a
+# permanent URL, so the QR code printed in enroll.pdf never needs regenerating.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ROLLING_TAG: apk-latest
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # The signing key lives only in Actions secrets. It is written to a
+      # gitignored keystore.properties, which app/build.gradle.kts reads.
+      # See tools/make-keystore.sh for how to produce the matching KEYSTORE_BASE64.
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::KEYSTORE_BASE64 secret is not set. See tools/make-keystore.sh."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > agent/keystore.jks
+          cat > agent/keystore.properties <<PROPS
+          KEYSTORE_PATH=$GITHUB_WORKSPACE/agent/keystore.jks
+          KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD
+          KEY_ALIAS=$KEY_ALIAS
+          KEY_PASSWORD=$KEY_PASSWORD
+          PROPS
+
+      - name: Test
+        run: ./gradlew --project-dir agent :app:testDebugUnitTest :app:lintDebug
+
+      - name: Assemble signed release
+        env:
+          RELAY_URL: ${{ secrets.RELAY_URL }}
+          AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
+          CONSOLE_TOKEN: ${{ secrets.CONSOLE_TOKEN }}
+        run: ./gradlew --project-dir agent :app:assembleRelease
+
+      - name: Verify signature
+        run: |
+          set -euo pipefail
+          APK=agent/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK"
+          # Fails the job if the APK is unsigned or debug-signed, which is the
+          # failure mode that would otherwise only surface on the demo phone.
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK"
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify -v "$APK" | grep -q "v2 scheme (APK Signature Scheme v2): true"
+          mv "$APK" agent/agent.apk
+          ls -la agent/agent.apk
+
+      - name: Upload APK as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-apk
+          path: agent/agent.apk
+          retention-days: 30
+
+      # The rolling tag is what makes the download URL permanent. The asset name
+      # is always agent.apk, so https://github.com/OWNER/REPO/releases/download/apk-latest/agent.apk
+      # is a constant baked into the QR code in enroll.pdf.
+      - name: Publish to the rolling release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SHA="$(git rev-parse --short HEAD)"
+          VERSION="$(grep -m1 'versionName' agent/app/build/outputs/apk/release/output-metadata.json | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')"
+
+          if gh release view "$ROLLING_TAG" >/dev/null 2>&1; then
+            gh release upload "$ROLLING_TAG" agent/agent.apk --clobber \
+              --notes "Rolling build from ${SHA}."
+            gh release edit "$ROLLING_TAG" --title "Break Remote agent (latest)" --notes "Rolling build from ${SHA}."
+          else
+            gh release create "$ROLLING_TAG" agent/agent.apk \
+              --title "Break Remote agent (latest)" \
+              --notes "Rolling build from ${SHA}."
+          fi
+
+          # Also cut an immutable versioned release so there is a rollback target
+          # and so a demo can be tied to an exact artifact.
+          VERSION_TAG="v${VERSION}+${SHA}"
+          gh release create "$VERSION_TAG" agent/agent.apk \
+            --title "Break Remote agent ${VERSION} (${SHA})" \
+            --notes "Commit ${SHA}." || echo "version tag $VERSION_TAG already exists"
+
+      - name: Print download URL
+        id: url
+        run: |
+          echo "url=https://github.com/${{ github.repository }}/releases/download/${ROLLING_TAG}/agent.apk" >> "$GITHUB_OUTPUT"
+          echo ""
+          echo "APK is live at:"
+          echo "https://github.com/${{ github.repository }}/releases/download/${ROLLING_TAG}/agent.apk"
+          echo ""
+          echo "Put that URL in the QR code in enroll.pdf (tools/make-qr.sh)."
+
+      - name: Summary
+        run: |
+          {
+            echo "### Signed APK published"
+            echo ""
+            echo "- commit: \`${GITHUB_SHA}\`"
+            echo "- download: [$ROLLING_TAG/agent.apk](${{ steps.url.outputs.url }})"
+          } >> "$GITHUB_STEP_SUMMARY"
