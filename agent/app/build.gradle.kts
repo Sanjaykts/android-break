@@ -97,5 +97,16 @@ android {
 dependencies {
     // Plan section 6.1: okhttp3 + kotlinx-coroutines-android. Nothing else.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // okio is okhttp's own transitive dependency. We import okio.ByteString
+    // directly (it is the type WebSocket.send takes), so it is pinned here
+    // rather than left to resolve implicitly. This is not an extra library.
+    implementation("com.squareup.okio:okio:3.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Test-only. Not shipped in the APK.
+    testImplementation("junit:junit:4.13.2")
+    // The android.jar used for local unit tests stubs org.json, so every call
+    // throws "not mocked". This supplies a real implementation on the test
+    // classpath only; the APK still uses the platform's org.json.
+    testImplementation("org.json:json:20240303")
 }

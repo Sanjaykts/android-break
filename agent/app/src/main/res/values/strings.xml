@@ -6,4 +6,26 @@
     <string name="accessibility_description">Lets Break Remote turn commands from your laptop into taps, swipes and typing on this screen, and to read the screen so it can be shown live. It cannot read your messages, photos or files.</string>
 
     <string name="ime_label">Break Remote Typing</string>
+
+    <!-- Foreground service channel. Deliberately worded so the notification is
+         itself part of the consent story rather than an annoyance. -->
+    <string name="capture_channel_name">Screen sharing</string>
+    <string name="capture_channel_description">Shown while your screen is being controlled from a laptop.</string>
+    <string name="capture_notification_title">Break Remote is controlling this phone</string>
+    <string name="capture_notification_text">Tap to open the app. Swipe the notification to stop.</string>
+
+    <!-- Enrollment -->
+    <string name="enroll_title">Break Remote</string>
+    <string name="enroll_subtitle">Your phone will be controlled from a laptop. Three permissions, and nothing happens without them.</string>
+    <string name="grant_accessibility">1. Turn on Accessibility</string>
+    <string name="grant_capture">2. Allow screen sharing</string>
+    <string name="grant_notifications">3. Allow notifications</string>
+    <string name="grant_gesture_probe">Gestures work (self-test)</string>
+    <string name="grant_optional">Optional: use Break Remote as a keyboard</string>
+    <string name="grant_battery">Set battery use to Unrestricted</string>
+    <string name="grant_screen_timeout">Set screen timeout to 30 minutes</string>
+    <string name="ready_label">Ready</string>
+    <string name="not_ready">Not ready yet</string>
+    <string name="relay_url_label">Relay address</string>
+    <string name="stop_capture">Stop screen sharing</string>
 </resources>
