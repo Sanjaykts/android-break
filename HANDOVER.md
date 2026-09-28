@@ -18,6 +18,29 @@ Android phone**, and one interactive web login.
 
 ---
 
+## 0. If you were given the zip
+
+The package contains a **built, signed, ready-to-install APK** at `apk/agent.apk`
+— you do not need to compile anything to put it on a phone. Verify it:
+
+```powershell
+certutil -hashfile apk\agent.apk SHA256     # compare with apk\SHA256SUMS.txt
+```
+
+> ### It will not connect yet. That is expected.
+>
+> The APK in the package was compiled against a **placeholder** relay address
+> (`wss://android-break-relay.example.workers.dev`). The relay has not been
+> deployed. Until you do steps 2 and 3 below, the app installs, grants all three
+> permissions and starts capture — then sits showing `relay: retrying` forever.
+>
+> You can still install it now to check the enrolment flow; only the connection
+> is missing. Everything else — the permission UI, the live badges, the
+> gesture self-test — works without the relay.
+
+`DO-NOT-FORWARD/` holds the release signing key so you can sign locally. CI does
+not need it. Read that folder's `README.txt` before sending it anywhere.
+
 ## 1. Do these five things, in this order
 
 ### 1. Back up the release keystore — do this today
