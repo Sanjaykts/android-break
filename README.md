@@ -1,5 +1,8 @@
 # Break Remote
 
+> **Taking this over? Read [`HANDOVER.md`](HANDOVER.md) first.** It has the exact
+> remaining sequence, the Windows setup, and where the secrets are.
+
 A single Android APK that turns a phone into a device you can drive from a laptop
 over the internet, on two different networks, with nothing installed on the laptop
 and no second app on the phone.
@@ -55,6 +58,21 @@ promise a dark phone.
 | `demo-start.sh` | One command: health check, then the console fullscreen |
 | `demo-preflight.sh` | Red/green checks before walking on stage |
 | `plan.md` | The original plan. Read [`docs/AMENDMENTS.md`](docs/AMENDMENTS.md) for what changed. |
+
+## Documentation
+
+| Document | Read it when |
+|---|---|
+| **[`HANDOVER.md`](HANDOVER.md)** | **Taking this over. Start here.** |
+| [`docs/SETUP.md`](docs/SETUP.md) | Setting up a fresh machine, or a build fails |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Deploying the relay, setting secrets, cutting a release |
+| [`docs/TESTING.md`](docs/TESTING.md) | Running or extending the test suites |
+| [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Something is broken |
+| [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md) | Before a demo. Read it the night before, not during |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Before changing anything structural |
+| [`docs/AMENDMENTS.md`](docs/AMENDMENTS.md) | Before changing anything — eleven known traps |
+| [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) | Testing the real phone; record the model there |
+| [`docs/PRIVACY.md`](docs/PRIVACY.md) | If anyone asks what is transmitted |
 
 ## How it works
 
@@ -124,6 +142,20 @@ There are two tokens on purpose. `CONSOLE_TOKEN` can be rotated in a Worker secr
 at any time without touching the phone. `AGENT_TOKEN` is baked into the APK, so
 rotating it needs a new release. After a demo, rotate the console token
 immediately and treat the agent token as spent.
+
+## Scripts
+
+Every script exists in both forms. The `.cmd` files are thin wrappers that
+invoke PowerShell with `-ExecutionPolicy Bypass`, so a locked-down Windows
+machine will not block them. The PowerShell is platform-agnostic and was verified
+by running it.
+
+| Purpose | Windows | macOS / Linux |
+|---|---|---|
+| Run every automated check | `.\check-all.cmd` | `./check-all.sh` |
+| Pre-demo red/green checks | `.\demo-preflight.cmd` | `./demo-preflight.sh` |
+| Health check, open the console | `.\demo-start.cmd` | `./demo-start.sh` |
+| The final gate before the demo | `.\demo-freeze.cmd` | `./demo-freeze.sh` |
 
 ## Tests
 

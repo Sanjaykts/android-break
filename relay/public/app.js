@@ -550,7 +550,11 @@ el.canvas.addEventListener("pointerdown", (ev) => {
   const p = toDevice(ev);
   if (!p) return;
   el.canvas.setPointerCapture(ev.pointerId);
-  drag = { id: ev.pointerId, start: p, last: p, t0: performance.now(), moved: false, fired: false };
+  drag = {
+    id: ev.pointerId, start: p, last: p,
+    t0: performance.now(), firstMoveAt: 0,
+    moved: false, fired: false,
+  };
   clearTimeout(longpressTimer);
   longpressTimer = setTimeout(() => {
     if (drag && !drag.moved) {
@@ -568,8 +572,14 @@ el.canvas.addEventListener("pointermove", (ev) => {
   drag.last = p;
   const dx = p.x - drag.start.x;
   const dy = p.y - drag.start.y;
-  if (Math.hypot(dx, dy) > slopInDevicePx()) {
+  if (Math.hypot(dx, dy) > slopInDevicePx() && !drag.moved) {
     drag.moved = true;
+    // When movement *started*, not when the finger lifted. A drag is defined by
+    // pressing and pausing before moving; timing it to pointerup means a fast
+    // flick on a busy machine can exceed the threshold and be misread as a drag,
+    // which is a latency-dependent bug in a product that has to survive a
+    // loaded laptop and a venue projector.
+    drag.firstMoveAt = performance.now();
     clearTimeout(longpressTimer);
   }
 });
@@ -586,9 +596,9 @@ el.canvas.addEventListener("pointerup", (ev) => {
   const dy = d.last.y - d.start.y;
 
   if (d.moved) {
-    // Long enough before release -> a drag. Short -> a flick/swipe. The
+    // Paused before moving -> a drag. Moved immediately -> a flick. The
     // distinction is what separates moving a slider from scrolling a list.
-    const held = dt >= DRAG_HOLD_MS;
+    const held = d.firstMoveAt > 0 && d.firstMoveAt - d.t0 >= DRAG_HOLD_MS;
     const ms = Math.max(120, Math.min(1500, Math.round(dt)));
     const op = held ? "drag" : "swipe";
     send({ op, x1: d.start.x, y1: d.start.y, x2: d.last.x, y2: d.last.y, ms });
