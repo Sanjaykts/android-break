@@ -141,7 +141,9 @@ $("#reset").onclick = async () => {
   if (typed !== "RESET_LAB") return;
   const r = await fetch("/lab/reset", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    // The reset route is console-gated like every other control. Without this
+    // header the button silently 401s and the analyst is left resetting by hand.
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
     body: JSON.stringify({ confirm: "RESET_LAB" }),
   });
   if (r.ok) { sessionFilter = null; load(); }

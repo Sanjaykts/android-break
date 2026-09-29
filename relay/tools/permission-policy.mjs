@@ -156,6 +156,14 @@ const runtimeData = [
   "android.permission.ACCESS_MEDIA_LOCATION",
   "android.permission.READ_EXTERNAL_STORAGE",
   "android.permission.READ_MEDIA_IMAGES",
+  // General location, added so the location row can perform a real consented
+  // read rather than returning a constant. The app reads only a last-known fix,
+  // only after an explicit grant, and falls back to the fixed lab coordinate
+  // otherwise -- see SyntheticData.consentedLocation. ACCESS_COARSE_LOCATION is
+  // declared alongside it because the emulated lab position usually lives in the
+  // coarse provider.
+  "android.permission.ACCESS_FINE_LOCATION",
+  "android.permission.ACCESS_COARSE_LOCATION",
 ];
 for (const p of benign) {
   if (labPerms.has(p)) pass(`${p.replace("android.permission.", "")} declared`);

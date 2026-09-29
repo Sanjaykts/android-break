@@ -129,7 +129,7 @@ class MainActivity : Activity() {
             val sms = SyntheticData.seedSms(this)
             val contacts = SyntheticData.seedContacts(this)
             val files = SyntheticData.seedFiles(this)
-            val loc = SyntheticData.labLocation()
+            val loc = SyntheticData.consentedLocation(this)
             note("Generated ${sms.size} SMS, $contacts contacts, ${files.size} files, location ${loc.third}")
             send(Telemetry.EV_MEDIA, "${files.size}_synthetic_files")
             send(Telemetry.EV_LOCATION, loc.third)
@@ -160,8 +160,8 @@ class MainActivity : Activity() {
             "app-private dir, ${files.size} file"
         }
         permissionRow("Read location", "ACCESS_FINE_LOCATION", Telemetry.EV_LOCATION) {
-            val loc = SyntheticData.labLocation()
-            note("Location: ${loc.first}, ${loc.second} — ${loc.third} (fixed test value, not GPS)")
+            val loc = SyntheticData.consentedLocation(this)
+            note("Location: ${loc.first}, ${loc.second} — ${loc.third}")
             loc.third
         }
 

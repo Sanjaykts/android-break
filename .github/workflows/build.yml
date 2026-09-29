@@ -58,7 +58,18 @@ jobs:
           PROPS
 
       - name: Test
-        run: ./agent/gradlew --project-dir agent :app:testDebugUnitTest :app:lintDebug :labapp:assembleDebug
+        run: ./agent/gradlew --project-dir agent :app:testDebugUnitTest :app:lintDebug :labapp:assembleDebug :toylab:assembleDebug
+
+      # The policy checks read built APKs, so the release artifact has to exist
+      # before they run. While this step came first, the teaching-artifact
+      # comparison silently SKIPped on every clean CI run, which is the failure
+      # mode a self-skipping check always produces.
+      - name: Assemble signed release
+        env:
+          RELAY_URL: ${{ secrets.RELAY_URL }}
+          AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
+          CONSOLE_TOKEN: ${{ secrets.CONSOLE_TOKEN }}
+        run: ./agent/gradlew --project-dir agent :app:assembleRelease
 
       # The lab app (proposal sections 5 and 10) must never gain a capability it
       # does not document. BIND_ACCESSIBILITY_SERVICE and mediaProjection are
@@ -70,12 +81,12 @@ jobs:
           cd relay && npm ci --silent
           node tools/permission-policy.mjs --agent ../agent/app/build/outputs/apk/release/app-release.apk
 
-      - name: Assemble signed release
-        env:
-          RELAY_URL: ${{ secrets.RELAY_URL }}
-          AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
-          CONSOLE_TOKEN: ${{ secrets.CONSOLE_TOKEN }}
-        run: ./agent/gradlew --project-dir agent :app:assembleRelease
+      # The training targets (proposal section 10, D2-D5 and D7) must keep both
+      # properties: each declared flaw is still present, and none of them can
+      # reach anything real. A training app that accidentally fixed itself
+      # teaches nothing; one that can phone home is a liability.
+      - name: Training-target policy
+        run: cd relay && node tools/toy-policy.mjs
 
       - name: Verify signature
         run: |

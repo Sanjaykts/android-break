@@ -1,6 +1,7 @@
 package dev.breakremote.lab
 
 import android.content.ContentResolver
+import android.location.LocationManager
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
@@ -171,6 +172,46 @@ object SyntheticData {
     /** A fixed synthetic location, returned without touching the GPS provider. */
     fun labLocation(): Triple<Double, Double, String> =
         Triple(LAB_LATITUDE, LAB_LONGITUDE, LAB_PLACE)
+
+    /**
+     * A *consented* location read, with the synthetic value as the fallback.
+     *
+     * The permission row for location only means something if a real read sits
+     * behind it: with ACCESS_FINE_LOCATION denied, [LocationManager] throws and
+     * we fall back to the fixed lab coordinate. That contrast is the actual
+     * lesson in proposal section 5 B2 -- without it, the prompt is decoration.
+     *
+     * The returned triple is (latitude, longitude, description). The description
+     * always states which of the two happened, so a screenshot cannot be mistaken
+     * for proof that the app read a real position.
+     */
+    fun consentedLocation(context: Context): Triple<Double, Double, String> {
+        val fine = context.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!fine) return labLocation()
+
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            ?: return labLocation()
+        return try {
+            // Coarse first: it needs only ACCESS_COARSE_LOCATION, and the emulated
+            // lab position is often available there when it is not in the fine fix.
+            val fix = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                ?: lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            if (fix == null) {
+                labLocation()
+            } else {
+                Triple(
+                    fix.latitude,
+                    fix.longitude,
+                    "platform last-known fix from ${fix.provider} (consented read)",
+                )
+            }
+        } catch (se: SecurityException) {
+            // The grant was revoked between the check and the call. Same lesson,
+            // and worth surfacing rather than swallowing.
+            Triple(LAB_LATITUDE, LAB_LONGITUDE, "$LAB_PLACE (grant revoked mid-read)")
+        }
+    }
 
     // ----------------------------------------------------------------- teardown
 

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      TRAINING TARGET. Every flaw in this app is intentional and is listed in
+      proposal section 10. It is not a product and must not be deployed.
+
+      The manifest is itself one of the lessons: see the exported activity and
+      the unprotected provider below, both of which are the vulnerabilities
+      rather than oversights.
+    -->
+
+    <!-- Used by the weak-TLS lesson, pointed at the local lab server only. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/toy_app_name"
+        android:theme="@android:style/Theme.Material.Light"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          FLAW 1, insecure deep links. Exported with a browsable intent filter and
+          no caller validation, so any app on the device or any page the user opens
+          can reach it and supply arbitrary extras.
+        -->
+        <activity
+            android:name=".DeepLinkDemo"
+            android:exported="true">
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="training" android:host="toylab" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          FLAW 3, improperly exported component. Exported with no readPermission
+          and no writePermission, so every app on the device can query it without a
+          permission prompt. Adding a signature-level permission is the whole fix.
+        -->
+        <provider
+            android:name=".ExportedComponentDemo$LabProvider"
+            android:authorities="dev.breakremote.toylab.lab"
+            android:exported="true" />
+    </application>
+</manifest>

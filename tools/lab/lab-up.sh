@@ -118,6 +118,18 @@ else
   warn "skipped: lab app not built"
 fi
 
+# ── 6b. training-target policy ────────────────────────────────────────────────
+printf '\n\033[1m6b. Training-target policy (proposal section 10, D2-D5 and D7)\033[0m\n'
+if [ -f "$ROOT/agent/toylab/build/outputs/apk/debug/toylab-debug.apk" ] && [ -d "$ROOT/relay/node_modules" ]; then
+  if (cd "$ROOT/relay" && node tools/toy-policy.mjs >/dev/null 2>&1); then
+    ok "each training flaw is present, and none can reach anything real"
+  else
+    bad "training-target policy violated -- run: cd relay && node tools/toy-policy.mjs"
+  fi
+else
+  warn "skipped: training targets not built (./gradlew :toylab:assembleDebug)"
+fi
+
 printf '\n%s\n' "────────────────────────────────────────────────────────────────"
 if [ "$FAILED" -gt 0 ]; then
   printf '\033[31m%d check(s) failed. The lab is not ready.\033[0m\n' "$FAILED"

@@ -17,7 +17,8 @@
     "soak": "node tools/soak-device.mjs",
     "lab:policy": "node tools/permission-policy.mjs",
     "lab:session": "node tools/lab-e2e.mjs",
-    "all": "npm run typecheck && npm run e2e && npm run smoke && npm run record && npm run lab:session && npm run lab:policy"
+    "all": "npm run typecheck && npm run e2e && npm run smoke && npm run record && npm run lab:session && npm run lab:policy && npm run toy:policy",
+    "toy:policy": "node tools/toy-policy.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260926.1",

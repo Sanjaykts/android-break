@@ -23,3 +23,4 @@ dependencyResolutionManagement {
 rootProject.name = "agent"
 include(":app")
 include(":labapp")
+include(":toylab")
