@@ -29,5 +29,9 @@ dist/
 *.webm
 tools/out/
 
+# NEVER commit a handover package. It embeds the release signing key.
+android-break-handover-*
+*.zip
+
 # --- macOS ---
 .DS_Store
