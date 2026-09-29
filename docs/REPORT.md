@@ -40,7 +40,8 @@ afterwards.
 | §10 Vulnerability classes | **8 of 8** | D1–D7 built and enforced; D8 delivered as a written discussion |
 | §11 Report | This document | |
 | §12 Evidence and attribution | Partly | Attribution automated. Client authorization reported received and recorded as a dated attestation (§10.1); the executed artifact is not yet attached to the repo |
-| §13 Risk controls | Yes | 4 of 5 automated; F4 needs the signed authorization |
+| §13 Risk controls | Yes | All 4 risks implemented and enforced; authorization attested, counter-part to be filed |
+| §15 Defensive outcomes | **Yes** | `docs/DEFENSIVE-OUTCOMES.md` — all 7 recommendations, each traced to a control actually exercised |
 
 ---
 

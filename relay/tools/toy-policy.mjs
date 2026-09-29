@@ -180,6 +180,50 @@ if (/training-token-/.test(allSource) && /UUID\.randomUUID/.test(allSource) &&
   fail("the token written to cleartext storage could come from a real credential source");
 }
 
+// ── 4. the written deliverables must still cover the proposal ────────────────
+// Section 10 and section 15 are deliverable-shaped, and a deliverable can rot in
+// the same way code does: a bullet gets dropped, or a recommendation quietly
+// stops being addressed. Both are cheap to check and invisible in review.
+console.log("\n4. The written deliverables still cover the proposal");
+const PROPOSAL = read(path.join(REPO, "AutomationX_Zions_EQB_Android_Security_Research_Demo_Proposal.md"));
+function section(n, next) {
+  const start = PROPOSAL.indexOf(`## ${n}.`);
+  const end = next ? PROPOSAL.indexOf(`## ${next}.`) : PROPOSAL.length;
+  return start === -1 ? "" : PROPOSAL.slice(start, end === -1 ? undefined : end);
+}
+const sec15 = section("15", "16");
+const sec10 = section("10", "11");
+if (!sec15 || !sec10) {
+  fail("could not locate proposal sections 10 and 15 -- has the proposal been renamed?");
+} else {
+  const recs = sec15.split("\n").filter((l) => l.trim().startsWith("- ")).map((l) => l.trim().slice(2));
+  const defensive = read(path.join(REPO, "docs/DEFENSIVE-OUTCOMES.md"));
+  const sections = defensive.split("\n").filter((l) => /^## \d+\./.test(l));
+  if (sections.length === recs.length) {
+    pass(`all ${recs.length} section 15 recommendations have a section of their own`);
+  } else {
+    fail(`section 15 has ${recs.length} recommendations but docs/DEFENSIVE-OUTCOMES.md has ${sections.length} sections`);
+  }
+  const classes = sec10.split("\n").filter((l) => l.trim().startsWith("- "));
+  const d8 = read(path.join(REPO, "docs/D8-PATCHED-VULNERABILITIES.md"));
+  if (d8) {
+    if (classes.length === 8) {
+      pass(`all ${classes.length} section 10 vulnerability classes accounted for`);
+    } else {
+      fail(`proposal section 10 lists ${classes.length} classes, not the 8 this check assumes -- reconcile D1-D8`);
+    }
+    // A discussion that starts citing CVE numbers starts going stale, and the
+    // point of the deliverable is that the pattern outlives the advisory.
+    if (/CVE-\d{4}-\d{4,}/.test(d8)) {
+      fail("D8 cites specific CVE identifiers; it should teach the pattern, not a dated list");
+    } else {
+      pass("D8 teaches recurring patterns and cites no dated CVE list");
+    }
+  } else {
+    fail("docs/D8-PATCHED-VULNERABILITIES.md is missing -- section 10 D8 has no deliverable");
+  }
+}
+
 console.log(`\n${"-".repeat(58)}`);
 if (failures) {
   console.log(`${failures} training-target policy violation(s).`);
