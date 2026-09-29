@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
+import { makeStore, validateEvent, type LabStore } from "./lab";
 import {
   CLOSE_BAD_REQUEST,
   CLOSE_TOO_LARGE,
@@ -67,6 +68,22 @@ export class Hub extends DurableObject<Env> {
         return this.connectAgent(url);
       case "/connect-console":
         return this.connectConsole(url);
+      case "/lab/session":
+        return this.issueSession();
+      case "/lab/event":
+        return this.ingest(request);
+      case "/lab/events":
+        return Response.json({ events: await this.store.events(url.searchParams.get("session") ?? undefined) });
+      case "/lab/sessions":
+        return Response.json({ sessions: await this.store.sessions() });
+      case "/lab/failures":
+        return Response.json({ failures: await this.store.failures() });
+      case "/lab/alerts":
+        return Response.json({ alerts: await this.store.alerts() });
+      case "/lab/reset":
+        return this.labReset(request);
+      case "/lab/health":
+        return Response.json({ ok: true, service: "lab-telemetry" });
       case "/devices":
         // The cache must be warmed before collecting. `collectDevices` is
         // synchronous and reads `metaCache`, which hibernation resets to null
@@ -161,6 +178,106 @@ export class Hub extends DurableObject<Env> {
    * activation re-reads the handful of device records.
    */
   private metaCache: Map<string, DeviceMeta> | null = null;
+
+  /** Lazily built so the relay path never pays for the lab half. */
+  private labStore: LabStore | null = null;
+
+  private get store(): LabStore {
+    if (!this.labStore) this.labStore = makeStore(this.ctx);
+    return this.labStore;
+  }
+
+  /**
+   * Issues a lab session id (proposal sections 4.1-4.2 and 7.6).
+   *
+   * Generated server-side so it cannot be forged by the page, and so attribution
+   * in section 12 rests on something the analyst controls.
+   */
+  private issueSession(): Response {
+    const id = `LAB-${new Date().getUTCFullYear()}-${crypto.randomUUID()
+      .slice(0, 8)
+      .toUpperCase()}`;
+    return Response.json({
+      session_id: id,
+      issued_at: new Date().toISOString(),
+      data_class: "TEST_ONLY",
+    });
+  }
+
+  /**
+   * Telemetry ingest (proposal section 7.6).
+   *
+   * Validation is server-side and a rejected payload is stored as a *control
+   * failure*, not just discarded. A payload that arrives without
+   * `data_class: TEST_ONLY` is evidence that something in the lab is wrong, and
+   * silently dropping it would hide the one event the analyst most needs to see.
+   */
+  private async ingest(request: Request): Promise<Response> {
+    if (request.method !== "POST") {
+      return Response.json({ error: "use POST" }, { status: 405 });
+    }
+
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      return Response.json({ error: "body is not valid JSON" }, { status: 400 });
+    }
+
+    const result = validateEvent(payload);
+    if (!result.ok) {
+      await this.store.recordFailure({
+        at: new Date().toISOString(),
+        reason: result.reason,
+        field: result.field,
+        raw: typeof payload === "object" ? summarizeRaw(payload) : String(payload).slice(0, 120),
+      });
+      return Response.json(
+        { error: "rejected", reason: result.reason, field: result.field },
+        { status: 422 }
+      );
+    }
+
+    const ev = result.event;
+    const claim = await this.store.claimSession(ev.session_id, ev.device_id);
+    if (!claim.known) {
+      await this.store.recordFailure({
+        at: new Date().toISOString(),
+        reason: `session ${ev.session_id} was already claimed by a different device`,
+        field: "session_id",
+        raw: ev.device_id,
+      });
+      return Response.json(
+        { error: "rejected", reason: "session id already belongs to another device" },
+        { status: 409 }
+      );
+    }
+
+    await this.store.append(ev);
+    return Response.json({ accepted: true, session_id: ev.session_id });
+  }
+
+  /**
+   * Lab reset (proposal section 7.10 and section 12: "the lab can be reset to a
+   * known-clean state"). Deliberately a separate route from the agent/console
+   * auth, so wiping the evidence store cannot be triggered by a stray console
+   * frame, and it requires its own confirmation parameter.
+   */
+  private async labReset(request: Request): Promise<Response> {
+    if (request.method !== "POST") {
+      return Response.json({ error: "use POST" }, { status: 405 });
+    }
+    const body = (await request.json().catch(() => ({}))) as { confirm?: string };
+    if (body.confirm !== "RESET_LAB") {
+      return Response.json(
+        { error: "confirmation required", expected: { confirm: "RESET_LAB" } },
+        { status: 400 }
+      );
+    }
+    await this.store.clear();
+    this.metaCache = null;
+    return Response.json({ reset: true, at: new Date().toISOString() });
+  }
 
   private async warmMeta(): Promise<Map<string, DeviceMeta>> {
     if (this.metaCache) return this.metaCache;
@@ -376,4 +493,19 @@ export interface Env {
   ASSETS: Fetcher;
   AGENT_TOKEN: string;
   CONSOLE_TOKEN: string;
+}
+
+/**
+ * Keeps a rejected payload safe to store and safe to display in the dashboard.
+ * The raw body could contain anything, so only shape and a short prefix survive.
+ */
+function summarizeRaw(v: unknown): Record<string, unknown> {
+  if (typeof v !== "object" || v === null) return { value: String(v).slice(0, 120) };
+  const o = v as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(o).slice(0, 12)) {
+    const val = o[k];
+    out[k] = typeof val === "string" ? val.slice(0, 120) : typeof val;
+  }
+  return out;
 }

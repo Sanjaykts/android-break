@@ -26,6 +26,18 @@ export default {
       case "/devices":
         return handleDevices(request, url, env);
 
+      // Lab telemetry. Proxied to the Hub Durable Object exactly like the
+      // WebSocket routes; the two auth tiers differ per route (see handleLab).
+      case "/lab/session":
+      case "/lab/event":
+      case "/lab/events":
+      case "/lab/sessions":
+      case "/lab/failures":
+      case "/lab/alerts":
+      case "/lab/reset":
+      case "/lab/health":
+        return handleLab(request, url, env);
+
       case "/ws/agent":
         return handleWs(request, url, env, env.AGENT_TOKEN, "agent");
 
@@ -94,6 +106,62 @@ async function handleWs(
     return new Response("missing device id", { status: 400 });
   }
 
+  return hubStub(env).fetch(new Request(target.toString(), request));
+}
+
+/**
+ * Lab routes.
+ *
+ * Three tiers, and the split is deliberate:
+ *
+ *   - `/lab/session` is unauthenticated. The landing page is what *issues* the
+ *     session, so requiring a token here would mean handing the analyst's
+ *     credential to a page that any lab participant can load. It returns nothing
+ *     sensitive -- just a fresh id and a timestamp.
+ *
+ *   - `/lab/event` requires the AGENT token, because only the lab app may write
+ *     telemetry. An unauthenticated ingest endpoint is an open log-injection
+ *     target and would let an attendee forge evidence.
+ *
+ *   - reads and `/lab/reset` require the CONSOLE token, so only the analyst can
+ *     read evidence or wipe it.
+ */
+async function handleLab(request: Request, url: URL, env: Env): Promise<Response> {
+  const path = url.pathname;
+
+  if (path === "/lab/health") {
+    return Response.json({ ok: true, service: "lab-telemetry" });
+  }
+
+  if (path === "/lab/session") {
+    if (request.method !== "POST") {
+      return Response.json({ error: "use POST" }, { status: 405 });
+    }
+    return proxyLab(request, env, path);
+  }
+
+  const needsAgentToken = path === "/lab/event";
+  const expected = needsAgentToken ? env.AGENT_TOKEN : env.CONSOLE_TOKEN;
+
+  const misconfiguredResponse = misconfigured(
+    env,
+    needsAgentToken ? "AGENT_TOKEN" : "CONSOLE_TOKEN"
+  );
+  if (misconfiguredResponse) return misconfiguredResponse;
+
+  const bearer = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+  const supplied = url.searchParams.get("token") ?? bearer;
+  if (!secretsEqual(supplied, expected)) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  return proxyLab(request, env, path);
+}
+
+function proxyLab(request: Request, env: Env, path: string): Promise<Response> {
+  const target = new URL(`https://hub${path}`);
+  const token = new URL(request.url).searchParams.get("token");
+  if (token) target.searchParams.set("token", token);
   return hubStub(env).fetch(new Request(target.toString(), request));
 }
 

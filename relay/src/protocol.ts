@@ -34,6 +34,9 @@ export const CLOSE_TOO_LARGE = 4409;
 export const KEY_DEVICE = (id: string) => `device:${id}`;
 export const KEY_PAIR_PREFIX = "pair:";
 export const KEY_PAIR = (consoleId: string) => `${KEY_PAIR_PREFIX}${consoleId}`;
+/** One lab session's claim record. Kept per-session so a session id cannot be
+ *  silently reused by a different device. */
+export const KEY_LAB_SESSION = (sessionId: string) => `lab:session:${sessionId}`;
 
 export interface DeviceMeta {
   id: string;

@@ -58,7 +58,17 @@ jobs:
           PROPS
 
       - name: Test
-        run: ./agent/gradlew --project-dir agent :app:testDebugUnitTest :app:lintDebug
+        run: ./agent/gradlew --project-dir agent :app:testDebugUnitTest :app:lintDebug :labapp:assembleDebug
+
+      # The lab app (proposal sections 5 and 10) must never gain a capability it
+      # does not document. BIND_ACCESSIBILITY_SERVICE and mediaProjection are
+      # declared in the manifest rather than uses-permission, so the check reads
+      # the built manifest rather than the permission list.
+      - name: Lab app permission policy
+        run: |
+          set -euo pipefail
+          cd relay && npm ci --silent
+          node tools/permission-policy.mjs --agent ../agent/app/build/outputs/apk/release/app-release.apk
 
       - name: Assemble signed release
         env:

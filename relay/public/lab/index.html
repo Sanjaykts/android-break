@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Authorised Security Lab — Session Start</title>
+<link rel="stylesheet" href="/lab/lab.css" />
+</head>
+<body>
+<main>
+  <header class="banner">
+    <strong>AUTHORISED SECURITY RESEARCH EXERCISE</strong>
+    <span>Organisational lab only. Synthetic data only. No real personal data is read or transmitted.</span>
+  </header>
+
+  <h1>Mobile application security demonstration</h1>
+
+  <p class="lede">
+    You have reached an isolated laboratory server. This page exists to start a
+    recorded test session so that every subsequent action can be attributed to it.
+  </p>
+
+  <section class="card">
+    <h2>What happens next</h2>
+    <ol>
+      <li>A session identifier is issued below and written to the page.</li>
+      <li>You install the signed test application on <em>this lab device</em>.</li>
+      <li>You grant permissions explicitly. Every prompt is captured as evidence.</li>
+      <li>The application generates and reads <em>synthetic</em> records only.</li>
+      <li>Telemetry arrives at the analyst dashboard, correlated to this session.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Your session</h2>
+    <dl class="kv">
+      <dt>Session id</dt><dd id="sid" class="mono">—</dd>
+      <dt>Device id</dt><dd id="did" class="mono">—</dd>
+      <dt>Issued at</dt><dd id="iat" class="mono">—</dd>
+    </dl>
+    <p class="hint">
+      Enter the session id into the test application when it asks for it. If the
+      application never asks, that is itself a finding — record it.
+    </p>
+    <button id="regen" type="button">Issue a new session</button>
+  </section>
+
+  <section class="card warn">
+    <h2>Boundaries</h2>
+    <p>
+      This exercise does not read your real messages, call log, contacts,
+      location, photos or files, and it does not use your camera or microphone.
+      It has no ability to survive a reboot and no ability to hide itself.
+    </p>
+    <p>
+      If anything on the device appears to do any of those things, stop the
+      exercise and report it before continuing.
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>Analyst</h2>
+    <p class="hint">The telemetry dashboard is a separate, authenticated page. It is not linked from this page on purpose: a participant in the exercise should not be able to read the evidence stream.</p>
+  </section>
+
+  <footer>
+    Every event in this session is recorded against a server-issued identifier so
+    that the results are attributable and reproducible. Session identifiers are
+    not reusable by a second device.
+  </footer>
+</main>
+<script type="module" src="/lab/landing.js"></script>
+</body>
+</html>

@@ -60,6 +60,13 @@ jobs:
       - name: Recording and presenter camera
         run: node tools/record-smoke.mjs --url http://127.0.0.1:8787
 
+      # Lab telemetry (proposal sections 9, 12, 13). The data_class gate and the
+      # session-attribution check are the two controls that make the
+      # demonstration's safety claims falsifiable, so they are asserted in CI
+      # rather than trusted.
+      - name: Lab telemetry controls
+        run: node tools/lab-e2e.mjs --url http://127.0.0.1:8787
+
       # Short by default so CI stays fast. The 30-minute soak is a pre-demo
       # ritual, not something every push needs to pay for.
       - name: Frame relay load

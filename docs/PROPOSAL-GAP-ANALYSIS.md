@@ -322,6 +322,28 @@ is worth **keeping** — it is what makes the work presentable.
 
 ---
 
+## 8a. What has been built since this analysis
+
+Slice A and the start of Slice B are now in the repository, so the numbers in
+§5.2 are a floor rather than current state.
+
+| Deliverable | Where | State |
+|---|---|---|
+| Execution plan and scope decision | `docs/EXECUTION-PLAN.md` | done |
+| Authorization and rules of engagement (template) | `lab/AUTHORIZATION.md` | done, **unsigned** |
+| Test-case matrix, expected vs observed | `lab/TEST-CASE-MATRIX.md` | 30 automated, 14 manual, 6 blocked |
+| Isolated landing page, server-issued sessions | `relay/public/lab/` | done |
+| Telemetry endpoint, §9 schema, enforced | `relay/src/lab.ts` | done, 26 checks green |
+| Analyst dashboard with alerts | `relay/public/lab/dashboard.html` | done |
+| Benign lab app, minimum permissions | `agent/labapp/` | builds, not yet on a device |
+| Synthetic dataset generator + purge | `SyntheticData.kt` | done |
+| Permission policy enforcement | `relay/tools/permission-policy.mjs` | 25 checks, in CI |
+| Kali/analyst lab tooling | `tools/lab/*.sh` | 4 scripts, syntax-checked |
+| Lab reset with before/after inventory | `tools/lab/reset.sh` | done and verified |
+
+Still absent: the five toy apps (§10 D2–D5, D7), SELinux and verified-boot
+evidence, a signed authorization record, and any physical-device run.
+
 ## 9. Immediate next steps
 
 1. **Send 1.1 to AutomationX.** Raise the §7 Step 4 contradiction. Everything else

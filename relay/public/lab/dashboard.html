@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Lab Telemetry — Analyst Dashboard</title>
+<link rel="stylesheet" href="/lab/lab.css" />
+<link rel="stylesheet" href="/lab/dashboard.css" />
+</head>
+<body>
+<header class="top">
+  <div>
+    <strong>Lab telemetry</strong>
+    <span class="sub">synthetic data only — every payload is validated server-side</span>
+  </div>
+  <div class="top-actions">
+    <span id="status" class="pill">connecting…</span>
+    <button id="refresh" type="button">Refresh</button>
+    <button id="reset" type="button" class="danger">Reset lab</button>
+  </div>
+</header>
+
+<main class="dash">
+  <section class="panel alerts">
+    <h2>Alerts</h2>
+    <div id="alerts" class="list"><p class="muted">none</p></div>
+  </section>
+
+  <section class="panel">
+    <h2>Sessions</h2>
+    <div id="sessions" class="list"><p class="muted">none</p></div>
+  </section>
+
+  <section class="panel wide">
+    <h2>Event stream <span id="filter-label" class="muted"></span></h2>
+    <table>
+      <thead><tr><th>time</th><th>session</th><th>device</th><th>event</th><th>value</th><th>class</th></tr></thead>
+      <tbody id="events"><tr><td colspan="6" class="muted">no events yet</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="panel wide">
+    <h2>Control failures <span class="muted">rejected payloads — the safety control firing</span></h2>
+    <div id="failures" class="list"><p class="muted">none</p></div>
+  </section>
+</main>
+
+<script type="module" src="/lab/dashboard.js"></script>
+</body>
+</html>

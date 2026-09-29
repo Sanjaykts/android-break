@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      PERMISSION MODEL. This is the most important file in the lab.
+
+      Compare with agent/ (the "Break Remote" teaching artifact), which requests
+      BIND_ACCESSIBILITY_SERVICE and FOREGROUND_SERVICE_MEDIA_PROJECTION. Those
+      two are the anti-pattern this exercise teaches, so they are ABSENT here.
+
+      What is present:
+        INTERNET, ACCESS_NETWORK_STATE   talking to the lab telemetry server
+        POST_NOTIFICATIONS              telemetry is always visible, never silent
+      What is requested at runtime, by the user, one at a time:
+        READ_SMS, READ_CONTACTS, ACCESS_MEDIA_LOCATION, READ_EXTERNAL_STORAGE
+        and only ever against records this app generated itself.
+
+      What is deliberately absent, permanently:
+        BIND_ACCESSIBILITY_SERVICE   no screen reading, no touch injection
+        FOREGROUND_SERVICE_MEDIA_PROJECTION  no screen capture
+        RECEIVE_BOOT_COMPLETED       no persistence across reboot
+        REQUEST_IGNORE_BATTERY_OPTIMIZATIONS  no exemption from the platform
+        CAMERA, RECORD_AUDIO         proposal section 3 excludes both
+        QUERY_ALL_PACKAGES, INSTALL_PACKAGES, SYSTEM_ALERT_WINDOW
+        Device admin, accessibility service, usage stats
+
+      Adding any of the absent permissions to this manifest invalidates the
+      demonstration. That is the point of the manifest.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <!-- API 33+ replaced READ_EXTERNAL_STORAGE for media with READ_MEDIA_*.
+         MainActivity picks whichever the running platform expects, so both have
+         to be declared or the permission demo fails on a modern device. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/lab_app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.NoActionBar"
+        android:usesCleartextTraffic="true">
+
+        <!--
+          usesCleartextTraffic is true because the lab server is plain HTTP on an
+          isolated network. This is acceptable ONLY because the lab is isolated;
+          on any real deployment it would be a finding, and the exercise should
+          demonstrate exactly that.
+        -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/lab_app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
