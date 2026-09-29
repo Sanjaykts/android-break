@@ -1,137 +1,147 @@
 #!/usr/bin/env bash
 #
-# seed-synthetic.sh — put synthetic SMS and contacts on an emulator or lab device
-# (proposal section 7, steps 5-6).
+# seed-synthetic.sh -- stage synthetic records for the consent-gated read.
 #
-# Why this exists:
+# ## What this actually does, and why
 #
-# `SyntheticData.seedSms` tries to insert through ContentResolver and gets a
-# SecurityException on any device where our app is not the default SMS handler.
-# That is the platform working correctly, not a bug, and the app degrades to an
-# in-memory dataset. But an in-memory dataset cannot demonstrate the thing the
-# proposal actually cares about: an app reading a real content provider *after*
-# the user consents.
+# The lab app's "Read synthetic SMS" / "Read synthetic contacts" rows exist to
+# demonstrate one thing: that an app cannot read a content provider until the
+# user grants it, and that the read fails before that. To show a *successful*
+# consented read there has to be something in the provider to read.
 #
-# So this writes the same records the app would have written, tagged with the
-# same LABONLY- marker, via adb. The app then reads them through the ordinary
-# permission-gated path. Nothing here bypasses a permission on the device: adb
-# shell runs as the shell user, which is how a developer would stage test data.
+# `SyntheticData.seedSms` / `seedContacts` try to insert directly. On a modern
+# Android device that fails, and it is supposed to -- a non-default app cannot
+# write another app's SMS or contacts. That refusal is the section 5 B2 lesson,
+# and it is left visible rather than engineered around.
 #
-# Requires an emulator or an adb-debuggable device. Never run against a personal
-# phone -- see lab/AUTHORIZATION.md section 3.
+# So this stages the records from the host instead. Two mechanisms, and they do
+# not have the same reach:
 #
-#   ./tools/lab/seed-synthetic.sh            # seed
-#   ./tools/lab/seed-synthetic.sh --show     # list what we put there
-#   ./tools/lab/seed-synthetic.sh --purge    # remove it
+#   SMS       `adb emu sms send` -- the emulator's own radio console. It injects
+#             through the radio, exactly like an incoming message, so the record
+#             is a genuine inbox row and the app reads it over the ordinary
+#             permission-gated path. Emulator only.
+#
+#   Contacts  NOT POSSIBLE on Android 11+. Neither the shell user nor a
+#             non-default app may write the contacts provider; Android 14
+#             answers with UnsupportedOperationException. Verified on API 34.
+#             This script reports that rather than pretending, and the app falls
+#             back to its visible in-app dataset.
+#
+# Nothing here bypasses a permission on the device. The app still has to be
+# granted READ_SMS before it can read any of it.
+#
+#   ./tools/lab/seed-synthetic.sh           # stage
+#   ./tools/lab/seed-synthetic.sh --show    # list what is there
+#   ./tools/lab/seed-synthetic.sh --purge   # remove it
 #
 set -uo pipefail
 
-MARKER="LABONLY"
-PKG="dev.breakremote.lab"
 MODE="${1:-seed}"
+SERIAL="${ANDROID_SERIAL:-$(adb devices 2>/dev/null | awk '$2=="device"{print $1; exit}')}"
 
 if ! command -v adb >/dev/null 2>&1; then
-  cat <<EOF
-adb is not available.
+  cat <<'EOF'
+adb is not available, so nothing was staged.
 
-This helper only makes sense for an emulator or a device with USB debugging
-enabled. On a physical lab device, prefer letting the app attempt the insert
-itself and accepting the SecurityException -- the refusal is part of the
-section 5 B2 lesson.
+Without a host, let the app attempt the insert itself. It will be refused on any
+modern Android device, and the refusal is the section 5 B2 lesson:
 
-Without adb, the in-app path still works:
-  - SyntheticData.seedSms / seedContacts insert directly when permitted
-  - and fall back to an in-app dataset when not
+  - SyntheticData.seedSms / seedContacts try a ContentResolver insert
+  - and fall back to a visible in-app dataset when the platform refuses
+
+A host with adb lets you stage real inbox rows via the emulator radio, so the
+consented read has something real to read.
 EOF
   exit 2
 fi
-
-SERIAL="${ANDROID_SERIAL:-$(adb devices | awk '$2=="device"{print $1; exit}')}"
-if [ -z "$SERIAL" ]; then
-  echo "no adb device connected" >&2
-  exit 2
-fi
+[ -z "$SERIAL" ] && { echo "no adb device connected" >&2; exit 2; }
 sh_() { adb -s "$SERIAL" shell "$@"; }
 
-# The app's marker is LABONLY- followed by a three-digit index. Match that so
-# tools/lab/reset.sh can verify a clean teardown afterwards.
-addr() { echo "$MARKER-$1"; }
-dt()   { echo "$(( 1735689600000 + $1 * 60000 ))"; }   # fixed epoch, ms
+# The app's marker is LABONLY-. The emulator radio console treats the first
+# argument as a sender address, so the marker has to live in the body, and the
+# sender has to look like a phone number or the console splits it oddly
+# (observed: "LABONLY-001" arrived as "001").
+BODIES=(
+  "Lab test message: enrollment confirmed for session."
+  "Lab test message: synthetic appointment at 14:00, room B."
+  "Lab test message: do not action. This record is test data only."
+  "Lab test message: permission prompt screenshot pending."
+  "Lab test message: relay handshake acknowledged."
+  "Lab test message: end of synthetic dataset."
+)
 
 seed_sms() {
-  local bodies=(
-    "Lab test message: enrollment confirmed for session."
-    "Lab test message: synthetic appointment at 14:00, room B."
-    "Lab test message: do not action. This record is test data only."
-    "Lab test message: permission prompt screenshot pending."
-    "Lab test message: relay handshake acknowledged."
-    "Lab test message: end of synthetic dataset."
-  )
-  local i=0
-  for b in "${bodies[@]}"; do
-    printf "  sms %s -> %s\n" "$(addr "$i")" "$b"
-    sh_ content insert \
-      --uri "content://sms/inbox" \
-      --bind "address:$(addr "$i")" \
-      --bind "body:$b" \
-      --bind "date:$(dt "$i")" \
-      --bind "read:1" >/dev/null 2>&1 \
-      || echo "     (insert refused -- already present, or provider restricted)"
+  echo "  SMS -- via the emulator radio console"
+  local i=1
+  for b in "${BODIES[@]}"; do
+    # $(( )) arithmetic is fine here; this is host-side, not device-side.
+    local sender
+    sender=$(printf "+155501%02d" "$i")
+    if adb -s "$SERIAL" emu sms send "$sender" "LABONLY- $b" >/dev/null 2>&1; then
+      printf '    %s  LABONLY- %s\n' "$sender" "${b:0:44}"
+    else
+      printf '    %s  FAILED to stage\n' "$sender"
+    fi
     i=$((i + 1))
   done
 }
 
 seed_contacts() {
-  local names=(Alpha Bravo Charlie Delta Echo)
-  local i=0
-  for n in "${names[@]}"; do
-    printf "  contact %s Contact %s\n" "$MARKER" "$n"
-    sh_ content insert \
-      --uri "content://com.android.contacts/rawContacts" \
-      --bind "account_type:local" \
-      --bind "account_name:$MARKER" >/dev/null 2>&1 \
-      || echo "     (raw contact insert refused)"
-    sh_ content insert \
-      --uri "content://com.android.contacts/data" \
-      --bind "mimetype:vnd.android.cursor.item/name" \
-      --bind "data1:$MARKER Contact $n" >/dev/null 2>&1 \
-      || echo "     (name insert refused)"
-    i=$((i + 1))
-  done
+  echo
+  echo "  Contacts -- NOT possible, and this is the platform working correctly"
+  local err
+  err=$(sh_ "content insert --user 0 --uri content://com.android.contacts/rawContacts --bind account_type:s:local" 2>&1)
+  if printf '%s' "$err" | grep -qi "unsupportedoperation\|securityexception\|permission"; then
+    echo "    confirmed on this device: the contacts provider refuses the writer"
+    printf '    %s\n' "$(printf '%s' "$err" | head -2 | tr -d '\r' | head -1)"
+  else
+    echo "    this device accepted the insert; verify with --show"
+  fi
+  echo
+  echo "    A non-default app cannot write contacts on Android 11+, and the shell"
+  echo "    user cannot either. So the app's contact row demonstrates the refusal"
+  echo "    and its visible in-app dataset instead. If the demonstration needs real"
+  echo "    provider rows, the lab app has to be the default contacts handler --"
+  echo "    a role the user grants on purpose, which is itself worth showing."
 }
 
 show() {
-  echo "SMS records matching $MARKER:"
-  sh_ content query --uri "content://sms/inbox" 2>/dev/null \
-    | tr ',' '\n' | grep -i "$MARKER" | sed 's/^/  /' || echo "  (none)"
+  echo "  SMS rows containing LABONLY-:"
+  sh_ "content query --user 0 --uri content://sms/inbox --projection address:body" 2>/dev/null \
+    | tr ',' '\n' | grep -i labonly | sed 's/^/    /' || echo "    (none)"
   echo
-  echo "Contacts matching $MARKER:"
-  sh_ content query --uri "content://com.android.contacts/contacts" 2>/dev/null \
-    | tr ',' '\n' | grep -i "$MARKER" | sed 's/^/  /' || echo "  (none)"
+  echo "  Contacts containing LABONLY:"
+  sh_ "content query --user 0 --uri content://contacts/contacts --projection display_name" 2>/dev/null \
+    | tr -d '\r' | grep -i labonly | sed 's/^/    /' || echo "    (none -- expected; see above)"
 }
 
 purge() {
-  echo "removing every $MARKER record"
-  sh_ content delete --uri "content://sms/inbox" --where "address LIKE '$MARKER%'" 2>&1 | sed 's/^/  /'
-  sh_ content delete --uri "content://com.android.contacts/rawContacts" \
-    --where "account_name='$MARKER'" 2>&1 | sed 's/^/  /'
+  echo "  removing staged SMS"
+  # No supported host-side delete on Android 11+; uninstall the messaging app's
+  # data or wipe the emulator. The reset script documents the verified route.
+  local n
+  n=$(sh_ "content query --user 0 --uri content://sms/inbox --projection body" 2>/dev/null \
+      | tr ',' '\n' | grep -ci labonly)
+  if [ "${n:-0}" -gt 0 ]; then
+    echo "    $n LABONLY- rows present; the provider exposes no host-side delete"
+    echo "    wipe the emulator to clear them, or uninstall the default SMS app"
+  else
+    echo "    none present"
+  fi
 }
 
 case "$MODE" in
   --show)  show ;;
   --purge) purge ;;
   seed)
-    echo "seeding synthetic records on $SERIAL"
+    echo "staging synthetic records on $SERIAL"
     echo
     seed_sms
-    echo
     seed_contacts
     echo
-    echo "Seeded. Now in the lab app, grant Read SMS and Read Contacts and use the"
-    echo "consent rows -- they read these records through the normal gated path."
-    echo
-    echo "  ./tools/lab/seed-synthetic.sh --show"
-    echo "  ./tools/lab/reset.sh          # verify a clean teardown"
+    echo "  Next: in the lab app, grant Read SMS and use the consent row."
+    echo "  It reads these inbox rows through the normal gated path."
     ;;
-  *) sed -n '20,26p' "$0"; exit 2 ;;
+  *) sed -n '28,32p' "$0"; exit 2 ;;
 esac

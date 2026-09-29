@@ -67,7 +67,28 @@ class WeakTlsDemo : ToyActivity() {
 
         section("Attempt a request with validation disabled")
         body.addView(
-            actionButton("Connect to the lab server, accepting any certificate") { attempt() }.withTop(6),
+            actionButton("Now do it correctly, with validation left on") {
+                Thread {
+                    val (text, ok) = attemptValidating()
+                    runOnUiThread {
+                        result("control", text, tone = if (ok) AMBER else GOOD)
+                    }
+                }.start()
+            }.withTop(6),
+        )
+        body.addView(
+            actionButton("Connect to the lab server, accepting any certificate") {
+                // Off the main thread. This ran inline and Android threw
+                // NetworkOnMainThreadException on every attempt from targetSdk 28
+                // up, so the lesson could never actually be observed on a device --
+                // the tab reported a network error and the flaw went undemonstrated.
+                Thread {
+                    val (text, ok) = attempt()
+                    runOnUiThread {
+                        result("result", text, tone = if (ok) RED else AMBER)
+                    }
+                }.start()
+            }.withTop(6),
         )
 
         section("What the fix looks like")
@@ -98,7 +119,7 @@ class WeakTlsDemo : ToyActivity() {
         )
     }
 
-    private fun attempt() {
+    private fun attempt(): Pair<String, Boolean> {
         // Port 8443 is the deliberately self-signed endpoint from
         // relay/tools/lab-tls-endpoint.mjs. It was previously aimed at 8787,
         // which is the plain-HTTP wrangler dev server -- so there was no
@@ -109,7 +130,7 @@ class WeakTlsDemo : ToyActivity() {
         // to be present for the connection to succeed: the trust-all manager
         // accepts the untrusted issuer, and the permissive hostname verifier
         // accepts the mismatch.
-        val target = "https://127.0.0.1:8443/lab/health"
+        val target = BuildConfig.TOYLAB_TLS_URL
         var out: String
         var accepted = false
         try {
@@ -123,32 +144,10 @@ class WeakTlsDemo : ToyActivity() {
             }
             val ctx = SSLContext.getInstance("TLS")
             ctx.init(null, arrayOf<TrustManager>(trust), java.security.SecureRandom())
-            // A trust-all socket factory. On Android SSLSocketFactory declares
-            // only two abstract createSocket overloads; the host/InetAddress
-            // variants are not part of the abstract surface here, so overriding
-            // them would not compile. javax.net.sockets is also absent from
-            // android.jar, so the return type is java.net.Socket throughout.
-            // A trust-all socket factory. Kotlin resolves three abstract
-            // createSocket overloads on this platform (javap on android.jar shows
-            // only two, which is why this is worth checking rather than guessing):
-            //   (Socket, String, int, boolean)
-            //   (Socket, InputStream, boolean)
-            //   (String, int)
-            // The remaining host/InetAddress variants are concrete here, and
-            // javax.net.sockets does not exist on Android at all.
-            // A trust-all socket factory. The exact set of abstract overloads
-            // varies between the android.jar stubs and what Kotlin resolves, so
-            // all six standard signatures are implemented rather than guessed at.
-            // javax.net.sockets does not exist on Android, so everything here is
-            // typed in terms of java.net.Socket.
-            // A trust-all socket factory.
-            //
-            // SSLSocketFactory has exactly ONE abstract method on Android:
-            // createSocket(Socket, String, int, boolean). The host/InetAddress
-            // overloads are concrete in the base class and delegate to it, so
-            // overriding them is unnecessary -- and attempting it fails to compile
-            // with "overrides nothing". javax.net.sockets is also absent from
-            // android.jar, so everything is typed in terms of java.net.Socket.
+            // A trust-all socket factory. SSLSocketFactory has one abstract
+            // createSocket on Android; the rest are concrete and delegate to it.
+            // javax.net.sockets does not exist in android.jar, so the return type
+            // is java.net.Socket throughout.
             val inner: SSLSocketFactory = ctx.socketFactory
             val factory = object : SSLSocketFactory() {
                 override fun getDefaultCipherSuites(): Array<String> = inner.defaultCipherSuites
@@ -200,10 +199,33 @@ class WeakTlsDemo : ToyActivity() {
                 "with a self-signed certificate — the point is that the handshake is " +
                 "accepted, not that a particular server is up."
         }
-        result(
-            "result",
-            out,
-            tone = if (accepted) RED else AMBER,
-        )
+        return out to accepted
+    }
+
+    /**
+     * The negative control: the identical request with certificate validation
+     * left at the platform default.
+     *
+     * A demonstration of a bypass is only persuasive when the same code path is
+     * shown *not* bypassing. The result is reported as GOOD when it is rejected,
+     * because rejection is the correct outcome here.
+     */
+    private fun attemptValidating(): Pair<String, Boolean> {
+        var conn: HttpsURLConnection? = null
+        return try {
+            conn = URL(BuildConfig.TOYLAB_TLS_URL).openConnection() as HttpsURLConnection
+            // No custom trust manager, no custom verifier. The platform decides.
+            val code = conn.responseCode
+            ("HTTP $code — the platform accepted it, which it should not have.\n\n" +
+                "If this succeeds, the lab certificate has been trusted by something " +
+                "outside this app, and the lesson above is not a valid comparison.") to true
+        } catch (e: Exception) {
+            ("Rejected: ${e.javaClass.simpleName} — ${e.message?.take(120) ?: ""}\n\n" +
+                "This is the correct outcome. The platform refused a certificate that " +
+                "is self-signed, untrusted, and issued to a name that does not match " +
+                "the address. The target above accepts exactly what this refuses.") to false
+        } finally {
+            conn?.disconnect()
+        }
     }
 }

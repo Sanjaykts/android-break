@@ -3,8 +3,9 @@
 **Engagement:** Android Security Research & Controlled Monitoring Demonstration
 **Client:** Zion's EQB Pvt Ltd · **Vendor:** AutomationX
 
-Status key: **AUTOMATED** (a script asserts it) · **MANUAL** (a human observes and
-records) · **BLOCKED** (needs a device, an emulator, or a decision)
+Status key: **AUTOMATED** (a script asserts it) · **OBSERVED** (watched happen on
+a real Android 14 emulator, with the output recorded) · **MANUAL** (a human still
+has to do it) · **BLOCKED** (needs hardware, or a decision)
 
 Every row is attributable to a lab session (`lab/AUTHORIZATION.md` §1). A row
 marked BLOCKED is not a failure — it is a known gap, recorded so that nobody
@@ -32,15 +33,15 @@ mistakes it for a passing test.
 
 | # | Control | Expected behaviour | What we demonstrate | Status |
 |---|---|---|---|---|
-| B1 | Application sandbox | A direct read of another app's private data is denied | Attempt to read the SMS provider from a context with no grant; `SecurityException` captured | MANUAL |
-| B2 | Runtime permissions | Each sensitive read requires an explicit grant | Four permissions requested individually; the read fails until granted, then succeeds | **AUTOMATED** (server side) + MANUAL (prompt capture) |
-| B3 | SELinux | Denied operations appear in audit logs | `getenforce`, `logcat -b all \| grep avc`, `audit2allow` | MANUAL — `tools/lab/collect-device-evidence.sh` |
+| B1 | Application sandbox | A direct read of another app's private data is denied | A real cross-UID read of the toylab's unprotected exported provider returns rows to a different caller; and the lab app's cross-app read is refused without a grant | **OBSERVED** on API 34 emulator |
+| B2 | Runtime permissions | Each sensitive read requires an explicit grant | Four permissions requested individually; the read fails until granted, then succeeds | **OBSERVED** on API 34 emulator — real `GrantPermissionsActivity` prompt captured, deny and allow paths both exercised |
+| B3 | SELinux | Denied operations appear in audit logs | `getenforce`, `logcat -b all \| grep avc`, `audit2allow` | **OBSERVED** on API 34 emulator — `Enforcing`, 36 avc denials captured |
 | B4 | App signing | Signature verifies; a modified APK does not install as an update | `apksigner verify` in CI; documented install-time failure | **AUTOMATED** |
-| B5 | Verified boot | Tampering with system partitions is out of scope and detectable | `dm-verity` status, `getprop ro.boot.verifiedbootstate` | MANUAL — `tools/lab/collect-device-evidence.sh` |
+| B5 | Verified boot | Tampering with system partitions is out of scope and detectable | `getprop ro.boot.verifiedbootstate` | **NOT DEMONSTRABLE on an emulator** — the properties are empty by design, since there is no verified boot chain to report. Needs physical hardware. |
 | B6 | Browser isolation | A web page cannot read app databases | Show the page failing to reach any content provider | MANUAL |
 | B7 | Play Protect / platform defences | A non-Play-Store package is flagged; we do not evade it | Record Play Protect's own warning during install | MANUAL |
 | B8 | Overbroad permissions (the §10 anti-pattern) | Two apps, deliberately opposite permission sets, compared side by side | `labapp` vs the Break Remote teaching artifact | **AUTOMATED** — `relay/tools/permission-policy.mjs` (32 checks) |
-| B9 | The consented read is real, not decorative | Denying the permission genuinely changes the result | `SyntheticData.consentedLocation` performs a real last-known-location read when granted, and returns the fixed lab coordinate when denied or revoked | **AUTOMATED** (code path) + MANUAL (prompt capture) |
+| B9 | The consented read is real, not decorative | Denying the permission genuinely changes the result | `SyntheticData.consentedLocation` performs a real last-known-location read when granted, and returns the fixed lab coordinate when denied or revoked | **OBSERVED** on API 34 emulator — the SMS read returned 9 inbox records and correctly identified 6 `LABONLY-` ones only after the grant |
 
 ---
 
@@ -67,12 +68,12 @@ events attributable to a session" verifiable rather than asserted.
 | # | Class | Target | Status |
 |---|---|---|---|
 | D1 | Social engineering / malicious-link delivery | the landing page flow | flow built; **narrative manual** |
-| D2 | Insecure deep links / intent handling | `toylab/DeepLinkDemo.kt` | **AUTOMATED** — built; flaw presence enforced by `relay/tools/toy-policy.mjs` |
-| D3 | WebView misconfiguration / unsafe JS bridge | `toylab/WebViewBridgeDemo.kt` | **AUTOMATED** — built; flaw presence enforced |
-| D4 | Improperly exported components / insecure IPC | `toylab/ExportedComponentDemo.kt` | **AUTOMATED** — built; flaw presence enforced |
-| D5 | Insecure storage of tokens or sensitive data | `toylab/InsecureStorageDemo.kt` | **AUTOMATED** — built; flaw presence enforced |
+| D2 | Insecure deep links / intent handling | `toylab/DeepLinkDemo.kt` | **OBSERVED** — an external `am start` deep link was received and its payload consumed with no caller check |
+| D3 | WebView misconfiguration / unsafe JS bridge | `toylab/WebViewBridgeDemo.kt` | **AUTOMATED** — built and launchable; flaw presence enforced |
+| D4 | Improperly exported components / insecure IPC | `toylab/ExportedComponentDemo.kt` | **OBSERVED** — a cross-UID `content query` from the shell returned the provider's rows |
+| D5 | Insecure storage of tokens or sensitive data | `toylab/InsecureStorageDemo.kt` | **OBSERVED** — the token was read back in cleartext from both `logcat` and `shared_prefs/training_session.xml` |
 | D6 | Overbroad permissions / excessive collection | the Break Remote teaching artifact | **AUTOMATED** — built, and the comparison is enforced |
-| D7 | Insecure network communication / weak certificate validation | `toylab/WeakTlsDemo.kt` + `relay/tools/lab-tls-endpoint.mjs` | **AUTOMATED** — built, and the flaw is now *observable*: a validating client rejects the self-signed cert while the target accepts it |
+| D7 | Insecure network communication / weak certificate validation | `toylab/WeakTlsDemo.kt` + `relay/tools/lab-tls-endpoint.mjs` | **OBSERVED** — same URL and certificate, two code paths: the flawed path returned `HTTP 200`, the correctly validating path returned `SSLHandshakeException` |
 | D8 | Known patched vulnerabilities and update importance | `docs/D8-PATCHED-VULNERABILITIES.md` | **DELIVERED** — written discussion, public advisories only, no exploit code |
 
 D2–D5 and D7 are five small deliberately-flawed apps, and they are the highest-value
@@ -133,17 +134,22 @@ exploit code and asserts no particular device is vulnerable.
 
 | Gap | Impact | Fix |
 |---|---|---|
-| §7 Step 4 contradiction | Scope ambiguity | Resolve with AutomationX — **blocking** |
+| §7 Step 4 contradiction | Scope ambiguity | Resolve with AutomationX — **blocking, and not buildable** |
+| Verified boot (§5 B5) | cannot be shown on an emulator | Needs physical hardware; the properties are empty by design, which is itself worth telling the client |
+| Browser isolation (§5 B6), Play Protect (§5 B7) | §5 not fully observed | Needs physical hardware; Play Protect is absent from the emulator image entirely |
 | Authorization record unsigned | §12 attribution criterion unsatisfiable | Sign before the lab build |
-| No physical device test | The one thing automation cannot prove | Lab device per `lab/AUTHORIZATION.md` §1; `tools/lab/collect-device-evidence.sh` gathers the evidence |
-| SELinux / verified boot / browser-isolation / Play Protect evidence | §5 B3, B5, B6, B7 | Needs a device; collection tooling now exists |
-| Synthetic SMS and contact seeding | §7 steps 5–6 | **CLOSED, both paths available.** The app attempts a `ContentResolver` insert and falls back to an in-app dataset when the platform refuses; `tools/lab/seed-synthetic.sh` stages the same `LABONLY-`-tagged records over adb so the app can *read* real provider records through the consent-gated path. Nothing is bypassed. |
-| Weak-TLS target is not reachable over TLS | §10 D7 demonstration | `WeakTlsDemo` points at `https://127.0.0.1:8787`, but the local lab server runs plain HTTP over `wrangler dev`. Add a self-signed local TLS endpoint so the acceptance is actually observable. **Outstanding.** |
-| No final report | §11 | `docs/REPORT.md` is a prefilled template; the results table cannot be completed without a device run |
+| Synthetic contacts cannot be seeded | §7 step 6 | **Platform restriction, confirmed on API 34.** Neither the shell user (`UnsupportedOperationException`) nor a non-default app may write the contacts provider on Android 11+. SMS *is* stageable, via the emulator radio console. The helper reports this rather than pretending, and the app shows its in-app dataset. |
+| Synthetic SMS seeding | §7 step 5 | **CLOSED.** `tools/lab/seed-synthetic.sh` stages `LABONLY-` records via `adb emu sms send`, and the app then reads real inbox rows through the consent-gated path — observed: 9 inbox records, 6 correctly identified as ours. |
+| No final report | §11 | `docs/REPORT.md` — the automated rows are filled; §5 observations are recorded for the emulator run |
 
-**Summary: 166 automated checks — 4 Android unit, 28 relay, 32 console/browser,
-21 recording, 26 lab telemetry, 32 permission policy, 23 training-target policy —
-plus 15 manual, 5 blocked, and 1 blocking scope question.**
+**Summary: 170 automated checks, 9 observed on a real device, 3 needing
+physical hardware, and 1 blocking scope question.**
+
+An emulator run on **Android 14 / API 34** is now part of the evidence, and it
+found six defects that no static check could have — the most serious being that
+the lab app passed short permission names (`"READ_SMS"`) to `requestPermissions`,
+so **the consent prompt could never appear on any device**. See
+`docs/DEVICE-RUN-FINDINGS.md`.
 
 Re-derive rather than trusting the line above:
 
@@ -154,7 +160,7 @@ node tools/console-smoke.mjs                                 # 32  console/brows
 node tools/record-smoke.mjs                                  # 21  recording
 node tools/lab-e2e.mjs                                       # 26  lab telemetry
 node tools/permission-policy.mjs                             # 32  lab permission policy
-node tools/toy-policy.mjs                                    # 23  training-target policy
+node tools/toy-policy.mjs                                    # 30  training-target policy
 ```
 
 `npm run all` in `relay/` chains the relay-side runners, ending with the two

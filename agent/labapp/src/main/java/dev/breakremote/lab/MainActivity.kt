@@ -50,11 +50,19 @@ class MainActivity : Activity() {
     private var sessionId = ""
     private var deviceId = ""
 
+    // An event that arrived before a session existed, replayed once one is issued.
+    private var retryEvent: Pair<String, String?>? = null
+    private var sessionInFlight = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         deviceId = "TEST-${android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)?.take(8)?.uppercase() ?: "ANDROID"}"
         buildUi()
         note("Lab app started. No background service, no accessibility, no screen capture.")
+        // Claim the session up front. Waiting for the analyst to press a button
+        // meant the first permission decision -- the most important event in the
+        // exercise -- was dropped for want of a session to attribute it to.
+        requestSession { }
     }
 
     override fun onDestroy() {
@@ -96,20 +104,7 @@ class MainActivity : Activity() {
             val url = urlField.text.toString().trim()
             if (url.isEmpty()) { note("Enter the lab server address first."); return@button }
             serverUrl = url
-            note("Requesting a session id…")
-            io.execute {
-                val s = Telemetry.issueSession(serverUrl)
-                runOnUiThread {
-                    if (s == null) {
-                        note("Could not reach the server. Check the address and that the lab server is running.")
-                    } else {
-                        sessionId = s
-                        sessionField.setText(s)
-                        note("Session issued: $s")
-                        send(Telemetry.EV_SESSION_START, "lab_app_launched")
-                    }
-                }
-            }
+            requestSession { }
         }.full().withTop(8))
 
         sessionField = EditText(this).apply {
@@ -223,6 +218,28 @@ class MainActivity : Activity() {
     private fun storagePermission(): String =
         if (Build.VERSION.SDK_INT >= 33) "READ_MEDIA_IMAGES" else "READ_EXTERNAL_STORAGE"
 
+    /**
+     * Expands a short permission name to the fully qualified form.
+     *
+     * The rows below are declared with short names for readability, but Android
+     * only resolves fully qualified ones. Passing "READ_SMS" straight through
+     * has two silent failure modes, and both look like the platform refusing
+     * rather than a bug:
+     *
+     *   - requestPermissions() launches the permission controller, which cannot
+     *     resolve the name, logs "None of [READ_SMS] in {...}" and dismisses
+     *     itself. **No consent prompt is ever shown**, and the row then reports
+     *     "denied" -- which is indistinguishable from a correct refusal.
+     *   - checkSelfPermission() returns PERMISSION_DENIED unconditionally, so
+     *     the header sticks on "0 of 4 permissions granted" even after the user
+     *     grants everything.
+     *
+     * Found by running the app on an API 34 emulator. No automated check caught
+     * it, because every check reads the manifest and the manifest was correct.
+     */
+    private fun fullyQualified(name: String): String =
+        if (name.startsWith("android.permission.")) name else "android.permission.$name"
+
     private fun permissionRow(
         title: String,
         permission: String,
@@ -233,7 +250,8 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(8), 0, dp(8))
         }
-        val granted = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+        val qualified = fullyQualified(permission)
+        val granted = checkSelfPermission(qualified) == PackageManager.PERMISSION_GRANTED
         val status = text(
             if (granted) "granted" else "not granted", 12f,
             if (granted) GOOD else WARN
@@ -246,8 +264,11 @@ class MainActivity : Activity() {
                     val v = onGranted()
                     send(event, v)
                 } else {
-                    send(Telemetry.EV_PERMISSION_PROMPT, permission)
-                    requestPermissions(arrayOf(permission), PERM_REQ_BASE + permission.hashCode().and(0xFF))
+                    send(Telemetry.EV_PERMISSION_PROMPT, qualified)
+                    requestPermissions(
+                        arrayOf(qualified),
+                        PERM_REQ_BASE + qualified.hashCode().and(0xFF),
+                    )
                 }
             }.full().withTop(6)
         )
@@ -303,12 +324,25 @@ class MainActivity : Activity() {
         0
     }
 
+    /**
+     * Counts inbox records that this engagement created.
+     *
+     * The marker is matched in **both** the sender and the body, because how a
+     * record gets staged varies: the app's own `seedSms` writes the marker into
+     * the sender address, while `tools/lab/seed-synthetic.sh` stages through the
+     * emulator radio console, which requires a phone-number-shaped sender and
+     * therefore carries the marker in the body. Matching only the sender made
+     * the helper's records read as "0 synthetic" -- a false negative that looks
+     * like the seeding failed.
+     */
     private fun countLabOnlySms(): Int = try {
+        val addr = android.provider.Telephony.Sms.ADDRESS
+        val body = android.provider.Telephony.Sms.BODY
         contentResolver.query(
             Telephony.INBOX,
-            arrayOf(android.provider.Telephony.Sms.ADDRESS),
-            "${android.provider.Telephony.Sms.ADDRESS} LIKE ?",
-            arrayOf("$MARKER_PREFIX%"),
+            arrayOf(addr),
+            "$addr LIKE ? OR $body LIKE ?",
+            arrayOf("$MARKER_PREFIX%", "$MARKER_PREFIX%"),
             null,
         )?.use { it.count } ?: 0
     } catch (e: Exception) {
@@ -317,7 +351,12 @@ class MainActivity : Activity() {
 
     private fun send(event: String, value: String?) {
         if (sessionId.isEmpty()) {
-            note("No session id yet — event '$event' not sent. Fetch one above.")
+            // Do not silently discard. The permission decisions are the most
+            // important events in the exercise, and section 12 requires every
+            // event to be attributable to a session -- so fetch one and retry
+            // rather than losing the event to a UI ordering detail.
+            note("No session id yet — requesting one so '$event' is not lost.")
+            requestSession { retryEvent = event to value }
             return
         }
         io.execute {
@@ -347,9 +386,44 @@ class MainActivity : Activity() {
         }
     }
 
+    /**
+     * Claims a server-issued session, then runs [after].
+     *
+     * Called automatically at launch and by the manual button, so an event can
+     * never be lost merely because the analyst has not pressed anything yet.
+     * [after] is how the caller passes back the event it was unable to send.
+     */
+    private fun requestSession(after: () -> Unit) {
+        if (sessionInFlight) return
+        if (sessionId.isNotEmpty()) { after(); return }
+        sessionInFlight = true
+        note("Requesting a session id…")
+        io.execute {
+            val issued = Telemetry.issueSession(serverUrl)
+            runOnUiThread {
+                sessionInFlight = false
+                if (issued == null) {
+                    note("Could not reach the server. Check the address and that the lab server is running.")
+                } else {
+                    sessionId = issued
+                    sessionField.setText(issued)
+                    note("Session issued: $issued")
+                    send(Telemetry.EV_SESSION_START, "lab_app_launched")
+                    val pending = retryEvent
+                    retryEvent = null
+                    if (pending != null) {
+                        note("Replaying '${pending.first}', which arrived before the session existed.")
+                        send(pending.first, pending.second)
+                    }
+                    after()
+                }
+            }
+        }
+    }
+
     private fun status() {
         val granted = listOf("READ_SMS", "READ_CONTACTS", storagePermission(), "ACCESS_FINE_LOCATION")
-            .count { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
+            .count { checkSelfPermission(fullyQualified(it)) == PackageManager.PERMISSION_GRANTED }
         statusView.text = "device $deviceId · $granted of 4 permissions granted · session ${sessionId.ifEmpty { "none" }}"
         statusView.setTextColor(if (granted == 4) GOOD else DIM)
     }

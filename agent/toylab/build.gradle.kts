@@ -19,6 +19,15 @@ android {
     compileSdk = 34
 
     defaultConfig {
+        // Loopback by default. 10.0.2.2 is the host as seen from an emulator, so
+        // a device-run demonstration needs this pointed at it; both are loopback
+        // from the device's point of view and neither can leave the host.
+        buildConfigField(
+            "String",
+            "TOYLAB_TLS_URL",
+            "\"" + (System.getenv("TOYLAB_TLS_URL") ?: "https://127.0.0.1:8443/lab/health") + "\"",
+        )
+
         applicationId = "dev.breakremote.toylab"
         minSdk = 26
         targetSdk = 34
@@ -53,6 +62,8 @@ android {
         }
         debug { applicationIdSuffix = ".debug" }
     }
+
+    buildFeatures { buildConfig = true }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

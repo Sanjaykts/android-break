@@ -36,6 +36,18 @@ open class ToyActivity : Activity() {
         setContentView(scroll)
     }
 
+    /**
+     * Clears the body and lets the caller repopulate it.
+     *
+     * Needed by targets that react to something arriving after onCreate -- most
+     * notably a deep link delivered to onNewIntent, where the tab has to redraw
+     * with the new intent rather than keep showing whatever it first rendered.
+     */
+    protected fun rebuild(fill: () -> Unit) {
+        body.removeAllViews()
+        fill()
+    }
+
     /** The red banner. Present on every target, first thing, every time. */
     protected fun header(lesson: String, vulnerability: String) {
         body.addView(text("TRAINING TARGET — DELIBERATELY VULNERABLE", 12f, RED, bold = true))

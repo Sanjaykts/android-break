@@ -41,27 +41,57 @@ class DeepLinkDemo : ToyActivity() {
             vulnerability = "Insecure deep links and intent handling",
         )
 
+        showIntent(intent)
+    }
+
+    /**
+     * A second deep link arrives here rather than in [onCreate].
+     *
+     * Without `android:launchMode="singleTop"` plus this override, a link opened
+     * while the app is already running is silently dropped: the activity is
+     * brought to the front and the new intent never surfaces. The tab then shows
+     * "(none)" for everything and the flaw looks like it is not working. Found by
+     * sending a real `am start` deep link on an API 34 emulator.
+     */
+    override fun onNewIntent(i: Intent) {
+        super.onNewIntent(i)
+        setIntent(i)
+        rebuild { showIntent(i) }
+    }
+
+    private fun showIntent(i: Intent?) {
         section("Incoming intent, unvalidated")
         result(
             "action",
-            intent?.action ?: "(none)",
+            i?.action ?: "(none)",
         )
         result(
             "data",
-            intent?.data?.toString() ?: "(none)",
+            i?.data?.toString() ?: "(none)",
         )
         result(
             "referrer",
-            intent?.getStringExtra("referrer") ?: "(none)",
+            i?.getStringExtra("referrer") ?: "(none)",
             tone = AMBER,
         )
 
         // The flaw, made visible: the extras are consumed with no caller check and
         // no signature check. If this were a real app, this is where the damage
         // would happen.
-        val payload = intent?.getStringExtra("payload")
+        // Read the payload from the URI query *as well as* from an extra. A
+        // browsable link can only carry the query string -- an external caller
+        // cannot attach extras to a VIEW intent the app will accept -- so reading
+        // only getStringExtra() meant the realistic attack path was not actually
+        // demonstrated: the tab displayed the untrusted URI and then claimed there
+        // was no payload.
+        val payload = i?.getStringExtra("payload")
+            ?: queryParameter(i?.data?.toString(), "payload")
         if (payload != null) {
-            result("payload consumed", payload, tone = RED)
+            result(
+                "payload consumed",
+                payload,
+                tone = RED,
+            )
             note("No check was made that the sender is this app. Whatever was " +
                 "supplied has been acted on.")
         } else {
@@ -100,4 +130,25 @@ class DeepLinkDemo : ToyActivity() {
         )
     }
 
+
+    /**
+     * Extracts a query parameter by hand.
+     *
+     * `Uri.getQueryParameter` returns null here for a URI whose query this app
+     * receives over `am start`, even though `Uri.toString()` plainly contains
+     * "payload=UNTRUSTED-CALLER" -- verified on an API 34 emulator. A training
+     * target that cannot reliably read its own input cannot demonstrate the flaw,
+     * so the query is parsed directly and getQueryParameter is not relied on.
+     */
+    private fun queryParameter(uri: String?, key: String): String? {
+        val q = uri?.substringAfter('?', "")?.takeIf { it.isNotEmpty() } ?: return null
+        for (pair in q.split('&')) {
+            val k = pair.substringBefore('=')
+            if (k == key) {
+                val v = pair.substringAfter('=', "")
+                return if (v.isEmpty()) null else java.net.URLDecoder.decode(v, "UTF-8")
+            }
+        }
+        return null
+    }
 }

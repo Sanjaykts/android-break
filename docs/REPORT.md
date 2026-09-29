@@ -73,9 +73,9 @@ Produced by the runners below. Re-run any row to confirm it.
 | V4 | Recording and playback determinism | **21 passed** | `node tools/record-smoke.mjs` |
 | V5 | Telemetry schema, attribution, and alerting | **26 passed** | `node tools/lab-e2e.mjs` |
 | V6 | The lab app holds only its documented permissions | **32 passed** | `node tools/permission-policy.mjs` |
-| V7 | Each training flaw is present **and** none can leave the device | **23 passed** | `node tools/toy-policy.mjs` |
+| V7 | Each training flaw is present **and** none can leave the device | **30 passed** | `node tools/toy-policy.mjs` |
 | V8 | Release APK is signed with v2 scheme | **pass** | `apksigner verify` in CI |
-| | **Total** | **166 automated checks** | |
+| | **Total** | **170 automated checks** | |
 
 ### The two results worth reading twice
 
@@ -97,26 +97,31 @@ dummy token, no dangerous permissions, no root, no shell-out).
 
 ## 5. Observed results
 
-**Empty. No lab device has been attached.** These are the items automation
-cannot substitute for, and they are the reason this report cannot yet be signed
-off.
+Partly filled. An **Android 14 / API 34 emulator** run is recorded below, and it
+found six real defects — see `docs/DEVICE-RUN-FINDINGS.md`. The rows that need
+*physical* hardware are still open, and an emulator cannot stand in for them.
 
 | # | Observation | Evidence | Status |
 |---|---|---|---|
-| O1 | Landing page states the exercise is authorised, shows a server-issued session id | screenshot | ☐ |
-| O2 | Each runtime permission prompt, captured as it appears | screenshot ×4 | ☐ |
-| O3 | Cross-app read denied by the sandbox (`SecurityException`) | screenshot | ☐ |
-| O4 | SELinux `enforcing`, with the denial in audit logs | `collect-device-evidence.sh` | ☐ |
-| O5 | Verified Boot / `dm-verity` state | `collect-device-evidence.sh` | ☐ |
-| O6 | Web page cannot reach any content provider | screenshot | ☐ |
-| O7 | Play Protect flags the non-store package — and we do not evade it | screenshot | ☐ |
-| O8 | Session id reaches the dashboard, correlated to the device | screenshot | ☐ |
-| O9 | Teardown leaves no synthetic record behind | before/after inventory | ☐ |
-| O10 | `dispatchGesture` injects touch on a real device | screen recording | ☐ |
+| O1 | Landing page states the exercise is authorised, shows a server-issued session id | `LAB-2026-2C15A534` issued and bound to one device | **observed** |
+| O2 | Each runtime permission prompt, captured as it appears | `Allow Lab Telemetry to send and view SMS messages?` | **observed** (SMS; one of four) |
+| O3 | Cross-app read denied by the sandbox | Lab app's cross-app read refused without a grant | **observed** |
+| O4 | SELinux `enforcing`, with the denial in audit logs | `Enforcing`, 36 `avc: denied` | **observed** |
+| O5 | Verified Boot / `dm-verity` state | properties empty on an emulator **by design** | ☐ needs hardware |
+| O6 | Web page cannot reach any content provider | | ☐ needs hardware |
+| O7 | Play Protect flags the non-store package — and we do not evade it | Play Protect is absent from the emulator image | ☐ needs hardware |
+| O8 | Session id reaches the dashboard, correlated to the device | `SESSION_START` → `PERMISSION_PROMPT` → `PERMISSION_GRANTED` → `SYNTHETIC_SMS_ACCESS`, all `TEST_ONLY` | **observed** |
+| O9 | Teardown leaves no synthetic record behind | `SyntheticData.purge` + `tools/lab/reset.sh`, automated | **partly** — needs a device run |
+| O10 | `dispatchGesture` injects touch on a real device | | ☐ needs hardware |
 
 `tools/lab/collect-device-evidence.sh` gathers O3–O5 automatically where adb is
 available, and prints the manual steps where it is not. It only runs read-only
 queries; it changes nothing on the device.
+
+**An emulator is not a substitute for the four hardware rows.** Verified boot has
+no chain to report, Play Protect is not present in the image, and a screen
+recording of a real `dispatchGesture` needs a real touchscreen. Those stay open
+rather than being marked done on emulator evidence.
 
 ---
 

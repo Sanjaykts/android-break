@@ -37,7 +37,8 @@
         -->
         <activity
             android:name=".DeepLinkDemo"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -45,6 +46,17 @@
                 <data android:scheme="training" android:host="toylab" />
             </intent-filter>
         </activity>
+
+        <!--
+          FLAW 2, 4 and 5 targets. These are not exported and carry no
+          intent filter: they are lessons reached from inside the app, and
+              leaving them unexported is the correct posture. They are declared
+          here only so they can be launched at all.
+        -->
+        <activity android:name=".WebViewBridgeDemo" android:exported="false" />
+        <activity android:name=".ExportedComponentDemo" android:exported="false" />
+        <activity android:name=".InsecureStorageDemo" android:exported="false" />
+        <activity android:name=".WeakTlsDemo" android:exported="false" />
 
         <!--
           FLAW 3, improperly exported component. Exported with no readPermission

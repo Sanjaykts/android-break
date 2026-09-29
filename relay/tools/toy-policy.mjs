@@ -116,6 +116,48 @@ for (const [id, what, file, test] of FLAWS) {
   if (test(src)) pass(`${id} ${what} is present in ${file}`);
   else fail(`${id} ${what} is NOT present in ${file} — the target no longer teaches anything`);
 }
+// Every target MainActivity offers a button for must actually be launchable.
+// Three of the five were never declared as activities, so tapping the tab threw
+// ActivityNotFoundException and the lesson could not be seen. Nothing in CI
+// caught it: the manifest parses, the sources compile, and the policy above was
+// only asserting the presence of flaws. Asserting that the app is *reachable*
+// is a different property from asserting what is wrong with it.
+const TARGETS = ["WebViewBridgeDemo", "ExportedComponentDemo", "InsecureStorageDemo", "WeakTlsDemo", "DeepLinkDemo"];
+const missingTargets = TARGETS.filter((c) => !new RegExp(`android:name="\\.${c}"`).test(manifestXml));
+if (missingTargets.length === 0) {
+  pass(`all ${TARGETS.length} training targets are declared, so every tab is launchable`);
+} else {
+  fail(`declared as buttons but not as activities: ${missingTargets.join(", ")} — the tab will throw ActivityNotFoundException`);
+}
+// And the launcher offers a button for each of them.
+const launcher = read(path.join(SRC, "MainActivity.kt"));
+const unlinked = TARGETS.filter((c) => !launcher.includes(`${c}::class.java`));
+if (unlinked.length === 0) {
+  pass("the launcher links to every declared target");
+} else {
+  fail(`declared but never launched from the launcher: ${unlinked.join(", ")}`);
+}
+// A bypass is only persuasive when the same request is shown NOT bypassing, so
+// the weak-TLS target must carry its own negative control.
+if (/attemptValidating/.test(sources["WeakTlsDemo.kt"] || "")) {
+  pass("the weak-TLS target includes a negative control (same URL, validation left on)");
+} else {
+  fail("WeakTlsDemo has no negative control -- the bypass is asserted but never contrasted");
+}
+// And the request must not run on the main thread, which Android forbids.
+if (/NetworkOnMainThread|Thread\s*\{/.test(sources["WeakTlsDemo.kt"] || "")) {
+  pass("the weak-TLS request runs off the main thread");
+} else {
+  fail("WeakTlsDemo appears to do its request on the main thread; Android will throw NetworkOnMainThreadException");
+}
+// A deep-link target that ignores onNewIntent silently drops any second link.
+const deep = sources["DeepLinkDemo.kt"] || "";
+if (/onNewIntent/.test(deep) && /launchMode="singleTop"/.test(manifestXml)) {
+  pass("the deep-link target handles onNewIntent with singleTop, so a second link is not dropped");
+} else {
+  fail("DeepLinkDemo needs both onNewIntent and launchMode=\"singleTop\" or a second deep link is silently dropped");
+}
+
 if (/android:exported="true"/.test(manifestXml) && !/android:permission=/.test(manifestXml)) {
   pass("D4 exported component is declared with no guarding permission");
 } else {
@@ -173,8 +215,13 @@ if (sources["WebViewBridgeDemo.kt"] && !/loadUrl\(/.test(codeOnly(sources["WebVi
 // claims, so two separate tests: the marker is a string literal (tested on raw
 // source, since codeOnly() would strip it), while the absence of any real
 // credential channel is a claim about code.
+// Scoped to the file that writes the token. The check used to run over the whole
+// module, which then tripped on BuildConfig.TOYLAB_TLS_URL in the weak-TLS target
+// -- a URL, not a credential. "No credential may come from config" is a claim
+// about the token, so it is tested where the token is produced.
+const storageCode = codeOnly(sources["InsecureStorageDemo.kt"] || "");
 if (/training-token-/.test(allSource) && /UUID\.randomUUID/.test(allSource) &&
-    !/System\.getenv|BuildConfig\.|getExternalStorage|openFileInput|\.jks|\.p12|\.pem/.test(toyCode)) {
+    !/System\.getenv|BuildConfig|getExternalStorage|openFileInput|\.jks|\.p12|\.pem/.test(storageCode)) {
   pass("the token written to cleartext storage is a locally generated training dummy");
 } else {
   fail("the token written to cleartext storage could come from a real credential source");
