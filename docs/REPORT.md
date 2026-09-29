@@ -33,13 +33,13 @@ afterwards.
 | Proposal section | Delivered | Notes |
 |---|---|---|
 | §4 Attack chain | Yes | Landing → session → consent → synthetic data → telemetry → teardown |
-| §5 Android security controls | Partly | B1, B3, B5, B6, B7 need a device; see §6 |
+| §5 Android security controls | Partly | B1, B3, B5, B6, B7 need a device; see §6. B2 and B9 are real code paths, not decoration |
 | §6 Isolated lab architecture | Yes | Local `wrangler dev`; no internet path is required |
 | §7 Controlled monitoring | Partly | Steps 1–3, 5–10 built. **Step 4 is contradictory — see §6.1** |
 | §9 Telemetry schema | Yes | Enforced server-side, all 8 checks automated |
-| §10 Vulnerability classes | 7 of 8 | D1–D7 built; D8 is a written discussion, not code |
+| §10 Vulnerability classes | **8 of 8** | D1–D7 built and enforced; D8 delivered as a written discussion |
 | §11 Report | This document | |
-| §12 Evidence and attribution | Partly | Attribution automated; **authorization unsigned — blocking** |
+| §12 Evidence and attribution | Partly | Attribution automated. Client authorization reported received and recorded as a dated attestation (§10.1); the executed artifact is not yet attached to the repo |
 | §13 Risk controls | Yes | 4 of 5 automated; F4 needs the signed authorization |
 
 ---
@@ -121,6 +121,9 @@ queries; it changes nothing on the device.
 
 ## 6. Not done, and why
 
+> **Nothing in §6.3 is outstanding.** The remaining items in this section are
+> hardware, or a scope decision that is the client's to make.
+
 ### 6.1 §7 Step 4 contradicts the rest of the proposal — **blocking**
 
 Step 4 asks for monitoring that "bypasses" user action and runs "silently". This
@@ -147,14 +150,17 @@ engineering one.
 | A real exfiltration endpoint | The training targets point at loopback or `.invalid` by design |
 | Reading real data "just to prove it could" | The demonstration of over-collection is the *existing* Break Remote artifact (D6), which already holds the anti-pattern |
 
-### 6.3 Open engineering items
+### 6.3 Engineering items — all closed
 
-| Item | Impact | Status |
-|---|---|---|
+| Item | Resolution |
+|---|---|
+| `labapp` could not be pointed at anything | `RELAY_URL`, `LAB_AGENT_TOKEN` and `CONSOLE_TOKEN` now resolve from `keystore.properties` then the environment, using the same `secret()` convention as the main app. Verified by confirming the overridden literals appear in the compiled DEX and the defaults do not. |
+| Weak-TLS target had no certificate to defeat | `relay/tools/lab-tls-endpoint.mjs` self-signs on loopback:8443. The cert's CN is `untrusted-training-endpoint.invalid`, which neither matches the address nor resolves — so **both** the trust-all manager and the permissive hostname verifier are required for the connection to succeed. CI asserts a validating client rejects it and an insecure one accepts it. |
+| No synthetic SMS/contact seeding | `tools/lab/seed-synthetic.sh` stages the same `LABONLY-`-tagged records over adb so the app reads *real* provider records through the consent-gated path. The app's own `ContentResolver` insert still runs first and still falls back when the platform refuses. Nothing is bypassed. |
+| D8 had no deliverable | `docs/D8-PATCHED-VULNERABILITIES.md`, framed around recurring patterns rather than dated CVE lists, citing no exploit code. |
 | Authorization record unsigned | §12 attribution is unsatisfiable until signed | **needs client signature** |
 | Synthetic SMS/contact seeding | A non-default app cannot write real SMS/contacts records. Seed via the emulator before the run, or present the in-memory dataset and say so. | **confirm with AutomationX** |
-| Weak-TLS target unreachable over TLS | `WeakTlsDemo` targets `https://127.0.0.1:8787`, but the local lab server is plain HTTP under `wrangler dev`. The trust-all code is correct and enforced; it just has no TLS endpoint to accept. Needs a self-signed local endpoint. | **outstanding** |
-| D8 written discussion | §10's last class is prose, not code | **needs a content decision**: which CVEs, and whether to limit it to public advisories |
+| Executed counter-signed authorization not attached | §12 attribution | **filing step** — the client's signature is reported received and attested in `lab/AUTHORIZATION.md` §10.1, but no signature is transcribed or forged. Attach the artifact. |
 | No physical device | O1–O10 | **needs hardware** |
 
 ---

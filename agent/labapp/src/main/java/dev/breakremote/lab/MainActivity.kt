@@ -46,7 +46,7 @@ class MainActivity : Activity() {
     private lateinit var sessionField: EditText
     private lateinit var urlField: EditText
 
-    private var serverUrl = DEFAULT_SERVER
+    private var serverUrl = BuildConfigLab.RELAY_URL
     private var sessionId = ""
     private var deviceId = ""
 
@@ -205,7 +205,6 @@ class MainActivity : Activity() {
     }
 
     private companion object {
-        const val DEFAULT_SERVER = "http://127.0.0.1:8787"
         const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
         const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
         const val BG = 0xFF0B0E11.toInt()
@@ -386,7 +385,17 @@ class MainActivity : Activity() {
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 }
 
-/** Build-time configuration, kept separate so it can be overridden per build. */
+/**
+ * Build-time configuration, kept separate so it can be overridden per build.
+ *
+ * This used to be a hand-rolled object with the token typed in as a literal,
+ * which meant no build could ever point the app at anything but a loopback
+ * default. It now reads the same [dev.breakremote.lab.BuildConfig] the Gradle
+ * script populates from keystore.properties or the environment, so one variable
+ * set at build time is enough to aim a release at the real lab relay.
+ */
 object BuildConfigLab {
-    val AGENT_TOKEN: String = "dev-agent-token"
+    val AGENT_TOKEN: String = BuildConfig.AGENT_TOKEN
+    val RELAY_URL: String = BuildConfig.RELAY_URL
+    val CONSOLE_TOKEN: String = BuildConfig.CONSOLE_TOKEN
 }

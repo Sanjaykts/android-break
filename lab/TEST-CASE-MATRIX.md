@@ -72,8 +72,8 @@ events attributable to a session" verifiable rather than asserted.
 | D4 | Improperly exported components / insecure IPC | `toylab/ExportedComponentDemo.kt` | **AUTOMATED** — built; flaw presence enforced |
 | D5 | Insecure storage of tokens or sensitive data | `toylab/InsecureStorageDemo.kt` | **AUTOMATED** — built; flaw presence enforced |
 | D6 | Overbroad permissions / excessive collection | the Break Remote teaching artifact | **AUTOMATED** — built, and the comparison is enforced |
-| D7 | Insecure network communication / weak certificate validation | `toylab/WeakTlsDemo.kt` | **AUTOMATED** — built; flaw presence enforced |
-| D8 | Known patched vulnerabilities and update importance | written discussion | **BLOCKED** — needs a content decision |
+| D7 | Insecure network communication / weak certificate validation | `toylab/WeakTlsDemo.kt` + `relay/tools/lab-tls-endpoint.mjs` | **AUTOMATED** — built, and the flaw is now *observable*: a validating client rejects the self-signed cert while the target accepts it |
+| D8 | Known patched vulnerabilities and update importance | `docs/D8-PATCHED-VULNERABILITIES.md` | **DELIVERED** — written discussion, public advisories only, no exploit code |
 
 D2–D5 and D7 are five small deliberately-flawed apps, and they are the highest-value
 part of §10. `relay/tools/toy-policy.mjs` enforces **two opposing properties** at
@@ -98,9 +98,10 @@ What is deliberately **not** covered, per scope:
 | Rooting, rooting-detection evasion, Play Protect bypass | §13 forbids evasion; a demo that dodges platform defences cannot then teach §5 B7. |
 | A real-world exfiltration target | The teaching targets point at loopback or `.invalid` on purpose. |
 
-D8 is a written deliverable rather than code, and needs a content decision: which
-specific CVEs to cover, and whether the discussion is limited to public advisories
-for apps on the lab device.
+D8 is a written deliverable rather than code. It is framed around recurring
+*patterns* rather than a list of CVE numbers, because a specific advisory is dated
+the moment a client reads it while the pattern keeps applying. It cites no
+exploit code and asserts no particular device is vulnerable.
 
 ---
 
@@ -136,9 +137,8 @@ for apps on the lab device.
 | Authorization record unsigned | §12 attribution criterion unsatisfiable | Sign before the lab build |
 | No physical device test | The one thing automation cannot prove | Lab device per `lab/AUTHORIZATION.md` §1; `tools/lab/collect-device-evidence.sh` gathers the evidence |
 | SELinux / verified boot / browser-isolation / Play Protect evidence | §5 B3, B5, B6, B7 | Needs a device; collection tooling now exists |
-| Synthetic SMS and contact seeding may fail | §7 steps 5–6 demonstration | Platform restriction: a non-default SMS/contacts app cannot write real records. Either seed via the emulator before the run, or present the in-memory dataset and state the limitation. **Confirm with AutomationX which they want shown.** |
+| Synthetic SMS and contact seeding | §7 steps 5–6 | **CLOSED, both paths available.** The app attempts a `ContentResolver` insert and falls back to an in-app dataset when the platform refuses; `tools/lab/seed-synthetic.sh` stages the same `LABONLY-`-tagged records over adb so the app can *read* real provider records through the consent-gated path. Nothing is bypassed. |
 | Weak-TLS target is not reachable over TLS | §10 D7 demonstration | `WeakTlsDemo` points at `https://127.0.0.1:8787`, but the local lab server runs plain HTTP over `wrangler dev`. Add a self-signed local TLS endpoint so the acceptance is actually observable. **Outstanding.** |
-| D8 written discussion | §10 | Needs a content decision |
 | No final report | §11 | `docs/REPORT.md` is a prefilled template; the results table cannot be completed without a device run |
 
 **Summary: 166 automated checks — 4 Android unit, 28 relay, 32 console/browser,

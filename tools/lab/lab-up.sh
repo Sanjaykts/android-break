@@ -130,6 +130,16 @@ else
   warn "skipped: training targets not built (./gradlew :toylab:assembleDebug)"
 fi
 
+# ── 6c. the weak-TLS demonstration needs a certificate to defeat ──────────────
+printf '\n\033[1m6c. Weak-TLS endpoint (proposal section 10, D7)\033[0m\n'
+if command -v openssl >/dev/null 2>&1 && [ -d "$ROOT/relay/node_modules" ]; then
+  ok "openssl available; node tools/lab-tls-endpoint.mjs can self-sign on loopback"
+  warn "not started automatically -- run it in a second terminal when demonstrating D7"
+  printf '       %s\n' "cd relay && node tools/lab-tls-endpoint.mjs --port 8443"
+else
+  warn "openssl missing; D7 cannot be demonstrated (the trust-all code still builds)"
+fi
+
 printf '\n%s\n' "────────────────────────────────────────────────────────────────"
 if [ "$FAILED" -gt 0 ]; then
   printf '\033[31m%d check(s) failed. The lab is not ready.\033[0m\n' "$FAILED"

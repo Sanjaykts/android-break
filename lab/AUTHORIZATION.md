@@ -179,6 +179,42 @@ stop conditions in §7 are accepted, and that nothing outside it will be attempt
 | For AutomationX | | Engagement lead | | |
 | For Zion's EQB | | Authorising officer | | |
 
+### 10.1 Authorization status
+
+| Field | Value |
+|---|---|
+| Client authorization | **Reported received by the vendor lead** — 2026-09-29 |
+| Attested by | Vendor lead, in session, stating the client signature had been given |
+| Executed counter-signed artifact on file | **Not yet attached** |
+
+The vendor lead has confirmed that the client's signature was obtained and
+instructed that work continue on that basis. That attestation is recorded here
+so the engagement has a dated, attributable statement of authorization, and
+§12's attribution requirement can be satisfied from it.
+
+Two things are deliberately **not** done here:
+
+1. **No signature is reproduced or transcribed.** A client's signature is the
+   client's mark; copying it into this file from a verbal report would create a
+   document that *looks* executed but is not. That is worse than an obvious gap,
+   because it would defeat the point of having an authorization record at all.
+2. **The execution is not back-dated or inferred.** The date above is the date the
+   attestation was made, which is a fact about this session.
+
+**To fully close §12, attach the signed counter-part** to this file — the
+executed document, or a scanned copy — and record its reference below. That is a
+filing step, not engineering, and it does not block any build work.
+
+| Reference for the executed counter-signed artifact | Date filed |
+|---|---|
+| | |
+
+**Scope caveat that survives all of the above.** Authorization covers the scope in
+§4 and §5. It does not resolve the contradiction in proposal §7 Step 4, which
+asks for monitoring that bypasses user action and silently contradicts §§1, 3
+and 12. That remains an open scope question for AutomationX regardless of
+signature, and nothing in it has been built. See `docs/REPORT.md` §6.1.
+
 ---
 
 ## Annex A — Device loan agreement
@@ -189,3 +225,50 @@ Attach if any device is not owned outright by the client.
 
 The summary an analyst carries. Derived from this document, not written
 separately, so the two cannot drift.
+
+### Annex B — Rules of engagement (the one-page card)
+
+**Before anything runs**
+
+1. Authorization recorded — see §10 and §10.1. Do not start without it.
+2. Device listed in §1, owned or on loan per Annex A. No personal devices. Ever.
+3. Network isolation confirmed: the lab is reachable only from the allowlist.
+4. `tools/lab/lab-up.sh` run clean. It fails loudly; do not bypass a failure.
+5. `tools/lab/reset.sh` run first, so teardown has a known-good baseline.
+
+**During**
+
+| Do | Do not |
+|---|---|
+| Ask the user for every permission, visibly, one at a time | Grant, pre-approve, or auto-accept a permission |
+| Generate synthetic records only | Read, collect, or display real messages, contacts, media, or location |
+| Show the dashboard and the session id | Hide the session id or the consent UI |
+| Stop and report on any stop condition | Work around a stop condition to keep a demo moving |
+| Capture evidence as it happens | Edit, retake, or tidy evidence afterwards |
+
+**Hard stops — halt the run and contact the client**
+
+- A real person's data appears anywhere, in any form.
+- The device reaches a network outside the allowlist.
+- Play Protect, a security feature, or a permission prompt is bypassed or
+  suppressed in any way.
+- Any proposal instruction appears to require bypassing user action. **Stop and
+  escalate.** §7 Step 4 is known to contradict §§1, 3 and 12; if the
+  demonstration appears to need it, the demonstration is wrong, not the safety
+  rule.
+- Anyone asks for the exercise to be extended beyond the devices in §1.
+
+**Always permitted, no approval needed**
+
+- Installing and removing the lab app and the training targets.
+- Reading public advisories and platform documentation.
+- Capturing logs, screenshots, and packet captures.
+- Declining to answer a permission prompt — refusal is a valid demonstration.
+
+**After**
+
+`tools/lab/reset.sh`, then verify a clean teardown. Anything left behind is a
+finding against us, not against Android.
+
+**The one-line version:** everything is synthetic, everything is visible to the
+user, and anything that would need consent to be bypassed is a stop, not a step.

@@ -43,3 +43,8 @@ Deploy the relay.md
 
 # --- macOS ---
 .DS_Store
+
+# Locally generated self-signed certificate for the D7 weak-TLS demonstration.
+# Generated on demand by relay/tools/lab-tls-endpoint.mjs; a private key has no
+# business in git even when it is a throwaway lab key.
+lab-evidence/

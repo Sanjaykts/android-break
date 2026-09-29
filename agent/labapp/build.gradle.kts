@@ -9,6 +9,30 @@ plugins {
 // teaches overbroad permissions, and the two apps have deliberately opposite
 // permission sets -- sharing a manifest would make that comparison impossible to
 // state honestly.
+
+// Same resolution order the main app uses (agent/app/build.gradle.kts):
+// gitignored keystore.properties, then the environment, then a dev default.
+// The lab app previously hardcoded "dev-agent-token" with no override at all,
+// which meant a release APK could only ever talk to loopback. It now takes both
+// the token and the relay URL from the build, so a real lab build points at the
+// real lab server and a developer's local build still just works.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
+fun secret(name: String, default: String = ""): String =
+    (keystoreProps.getProperty(name) ?: System.getenv(name) ?: default).trim()
+
+// 10.0.2.2 is the host loopback as seen from an Android emulator. 127.0.0.1
+// inside the emulator is the emulator itself, which is why the default differs
+// from the main app's.
+val defaultRelay = if (System.getenv("ANDROID_EMULATOR") != null) {
+    "http://10.0.2.2:8787"
+} else {
+    "http://127.0.0.1:8787"
+}
+
 android {
     namespace = "dev.breakremote.lab"
     compileSdk = 34
@@ -20,7 +44,11 @@ android {
         versionCode = 1
         versionName = "1.0.0-lab"
 
-        buildConfigField("String", "AGENT_TOKEN", "\"dev-agent-token\"")
+        buildConfigField("String", "AGENT_TOKEN", "\"${secret("LAB_AGENT_TOKEN", "dev-agent-token")}\"")
+        // Named RELAY_URL so CI and the lab runbook pass the same variable the
+        // main app already uses.
+        buildConfigField("String", "RELAY_URL", "\"${secret("RELAY_URL", defaultRelay)}\"")
+        buildConfigField("String", "CONSOLE_TOKEN", "\"${secret("CONSOLE_TOKEN", "dev-console-token")}\"")
     }
 
     signingConfigs {

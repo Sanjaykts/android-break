@@ -99,7 +99,17 @@ class WeakTlsDemo : ToyActivity() {
     }
 
     private fun attempt() {
-        val target = "https://127.0.0.1:8787/lab/health"
+        // Port 8443 is the deliberately self-signed endpoint from
+        // relay/tools/lab-tls-endpoint.mjs. It was previously aimed at 8787,
+        // which is the plain-HTTP wrangler dev server -- so there was no
+        // certificate to defeat and the flaw could not actually be observed.
+        //
+        // The certificate's CN is untrusted-training-endpoint.invalid, which does
+        // not resolve and does not match this address. Both defects therefore have
+        // to be present for the connection to succeed: the trust-all manager
+        // accepts the untrusted issuer, and the permissive hostname verifier
+        // accepts the mismatch.
+        val target = "https://127.0.0.1:8443/lab/health"
         var out: String
         var accepted = false
         try {
