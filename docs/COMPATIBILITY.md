@@ -12,18 +12,27 @@ Android phone" until at least two vendors are green.
 
 | Device class | Android | Status | Known risk |
 |---|---|---|---|
-| **The demo device** | *fill in on Day 1* | **not yet tested** | Unknown until identified. Record model and API level below before anything else |
+| **The demo device** | Redmi Note 8, Android 11 (API 30) | **connected 2026-09-28; device behaviour untested** | Xiaomi is the most aggressive service-killer of the vendors listed. Accessibility path is `Installed services`, not `Downloaded apps` |
 | Samsung Galaxy | 12–15 | untested | Aggressive battery manager kills background services. Accessibility path is `Downloaded apps` |
 | Xiaomi / Redmi / Poco | 12–14 | untested | Most aggressive service killing. Path is `Installed services` |
 | Oppo / Realme / Vivo | 12–14 | untested | Some versions restrict accessibility services from sideloaded apps |
 | Android 8–11 | 8–11 | best-effort by construction | Different MediaProjection consent flow; no `getWindows()`; different foreground-service rules |
 
-<!-- Demo device: record here on Day 1. Without this the compatibility claim is
-     unmakeable and the enrollment screenshots cannot be taken. -->
+<!-- Demo device: recorded 2026-09-28 from the relay's own device metadata
+     (the agent's `hello` payload), not guessed. -->
 
-- **Model:**
-- **Android version / API level:**
-- **Tested on:**
+- **Model:** Redmi Note 8
+- **Android version / API level:** Android 11 / API 30
+- **Brand:** xiaomi
+- **Tested on:** 2026-09-28 — relay enrolment, WebSocket connect, agent `hello`
+  handshake and live binary screen-frame streaming all confirmed. **Not yet
+  confirmed on this device:** that `dispatchGesture` produces a real touch event,
+  that MediaProjection consent survives, frame rate on real 4G, and 30-minute
+  stability. Those are exactly the checks in the checklist below.
+
+> **The compatibility claim is still "engineered for Android 8.0+, transport fully
+> tested, device behaviour untested."** One connected Redmi is a data point, not a
+> claim. Two vendors is a claim.
 
 ## Per-version code paths
 

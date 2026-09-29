@@ -73,6 +73,7 @@ promise a dark phone.
 | [`docs/AMENDMENTS.md`](docs/AMENDMENTS.md) | Before changing anything — eleven known traps |
 | [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) | Testing the real phone; record the model there |
 | [`docs/PRIVACY.md`](docs/PRIVACY.md) | If anyone asks what is transmitted |
+| [`docs/PROPOSAL-GAP-ANALYSIS.md`](docs/PROPOSAL-GAP-ANALYSIS.md) | **Zion's EQB security-research proposal: what exists, what is missing, what to build, in what order** |
 
 ## How it works
 

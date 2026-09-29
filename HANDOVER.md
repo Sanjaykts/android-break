@@ -41,6 +41,17 @@ certutil -hashfile apk\agent.apk SHA256     # compare with apk\SHA256SUMS.txt
 `DO-NOT-FORWARD/` holds the release signing key so you can sign locally. CI does
 not need it. Read that folder's `README.txt` before sending it anywhere.
 
+## 0b. New requirement: the Zion's EQB security-research proposal
+
+The client sent a **different project** — a defensive, lab-only, synthetic-data
+Android security awareness exercise. This repository is a remote-control tool.
+They are not the same deliverable.
+
+Read [`docs/PROPOSAL-GAP-ANALYSIS.md`](docs/PROPOSAL-GAP-ANALYSIS.md) before
+quoting any completion figure. Short version: ~90% complete against the original
+brief, **~12% against the proposal**, with one scope contradiction in the proposal
+itself that must be resolved with AutomationX before anything is built.
+
 ## 1. Do these five things, in this order
 
 ### 1. Back up the release keystore — do this today

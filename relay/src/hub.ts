@@ -68,6 +68,13 @@ export class Hub extends DurableObject<Env> {
       case "/connect-console":
         return this.connectConsole(url);
       case "/devices":
+        // The cache must be warmed before collecting. `collectDevices` is
+        // synchronous and reads `metaCache`, which hibernation resets to null
+        // while leaving the sockets open -- so without this the Hub reports every
+        // device as model "unknown", sdk 0 after a wake. `broadcastDevices`
+        // already warms first for the same reason; this is the HTTP twin of it.
+        // The data is in storage either way, so this is a read path, not a write.
+        await this.warmMeta();
         return Response.json({ devices: this.collectDevices() });
       default:
         return new Response("not found", { status: 404 });

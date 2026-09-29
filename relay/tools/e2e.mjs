@@ -156,6 +156,22 @@ async function main() {
   // connected consoles to every phone, so assert it does not happen.
   check("the device list is not broadcast to agents", !a.json.some((m) => m.op === "devices"));
 
+  // The HTTP /devices endpoint has its own read path, and it is the one
+  // demo-preflight.ps1 and demo-start.ps1 use -- so it is not covered by the
+  // console-broadcast assertions above. It once forgot to warm `metaCache`
+  // before collecting, so after Durable Object hibernation it reported every
+  // device as model "unknown", sdk 0, while the console showed the truth. A
+  // reviewer reading only the tests would conclude /devices was covered.
+  {
+    const res = await fetch(`${HTTP}/devices?token=${encodeURIComponent(CONSOLE_TOKEN)}`)
+      .catch(() => null);
+    const body = res && res.status === 200 ? await res.json().catch(() => null) : null;
+    const dev = body?.devices?.find((d) => d.id === DEVICE);
+    check("GET /devices returns the same real metadata the console sees",
+      !!dev && dev.model === "E2E" && dev.sdk === 34,
+      JSON.stringify({ status: res?.status, dev }));
+  }
+
   // ── 2b. a console that connects LATE still sees the device ────────────────
   // Regression guard. The device list is only broadcast on agent connect and on
   // hello, so without an explicit snapshot on console connect a console opened

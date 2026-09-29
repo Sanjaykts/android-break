@@ -29,9 +29,17 @@ dist/
 *.webm
 tools/out/
 
-# NEVER commit a handover package. It embeds the release signing key.
-android-break-handover-*
+# --- Handover archives ---
+# The generated handover zip embeds DO-NOT-FORWARD/keystore.jks, the release
+# signing key, plus its password. Never commit one. Build without it via:
+#   ./tools/make-handover-zip.sh --no-secrets
 *.zip
+
+# --- Local-only documentation (contains live relay tokens) ---
+# These are scratch notes someone kept during deployment with a real
+# CONSOLE_TOKEN pasted inline. docs/DEPLOY.md is the committed equivalent.
+SETUP-AND-USE.md
+Deploy the relay.md
 
 # --- macOS ---
 .DS_Store
