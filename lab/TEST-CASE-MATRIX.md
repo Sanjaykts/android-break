@@ -142,7 +142,7 @@ exploit code and asserts no particular device is vulnerable.
 | Synthetic SMS seeding | §7 step 5 | **CLOSED.** `tools/lab/seed-synthetic.sh` stages `LABONLY-` records via `adb emu sms send`, and the app then reads real inbox rows through the consent-gated path — observed: 9 inbox records, 6 correctly identified as ours. |
 | No final report | §11 | `docs/REPORT.md` — the automated rows are filled; §5 observations are recorded for the emulator run |
 
-**Summary: 170 automated checks, 9 observed on a real device, 3 needing
+**Summary: 173 automated checks, 9 observed on a real device, 3 needing
 physical hardware, and 1 blocking scope question.**
 
 An emulator run on **Android 14 / API 34** is now part of the evidence, and it

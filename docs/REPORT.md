@@ -75,7 +75,7 @@ Produced by the runners below. Re-run any row to confirm it.
 | V6 | The lab app holds only its documented permissions | **32 passed** | `node tools/permission-policy.mjs` |
 | V7 | Each training flaw is present **and** none can leave the device | **30 passed** | `node tools/toy-policy.mjs` |
 | V8 | Release APK is signed with v2 scheme | **pass** | `apksigner verify` in CI |
-| | **Total** | **170 automated checks** | |
+| | **Total** | **173 automated checks** | |
 
 ### The two results worth reading twice
 
